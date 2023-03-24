@@ -210,7 +210,7 @@ namespace cs::semantic {
             result.arguments.emplace_back("-o");
             result.arguments.push_back(output.value().string());
         }
-        std::copy(object_files.begin(), object_files.end(), std::back_inserter(result.arguments));
+        std::copy(real_object_files.begin(), real_object_files.end(), std::back_inserter(result.arguments));
 
         std::list<cs::Entry> results;
         results.emplace_back(std::move(result));
