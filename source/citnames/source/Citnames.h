@@ -36,7 +36,8 @@ namespace cs {
 
     struct Arguments {
         fs::path input;
-        fs::path output;
+        fs::path output_compile;
+        fs::path output_link;
         bool append;
     };
 

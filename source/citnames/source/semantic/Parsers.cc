@@ -207,12 +207,23 @@ namespace cs::semantic {
         }
         // partial match is less likely to be a few steps away from the lower bound,
         // therefore search the whole flag list again.
-        for (const auto &candidate : flags_) {
-            if (auto result = check_partial(key, candidate); result) {
-                return result;
+
+        size_t prefix_length_best = 0;
+        std::optional<std::string> candidate_best = std::nullopt;
+
+        for (const auto &[candidate, info] : flags_) {
+            if (const auto& extra = split_extra(candidate, key); extra) {
+                const size_t prefix_length = key.size() - extra.value().size();
+                if (prefix_length > prefix_length_best) {
+                    prefix_length_best = prefix_length;
+                    candidate_best = std::optional<std::string>(std::string(candidate));
+                }
             }
         }
-        return std::nullopt;
+
+        return (candidate_best.has_value())
+            ? check_partial(key, *(flags_.find(candidate_best.value())))
+            : std::nullopt;
     }
 
     std::optional<FlagParser::Match>
@@ -246,7 +257,7 @@ namespace cs::semantic {
                     break;
                 default:
                     // This should not happen here. Exact match is already filtered out.
-                    return std::nullopt;
+                    __builtin_unreachable();
             }
         }
         return std::nullopt;

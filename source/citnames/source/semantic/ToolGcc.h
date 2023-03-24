@@ -27,7 +27,7 @@ namespace cs::semantic {
     struct ToolGcc : public Tool {
 
         [[nodiscard]]
-        rust::Result<SemanticPtr> recognize(const Execution &execution) const override;
+        rust::Result<SemanticPtr> recognize(const Execution &execution, const BuildTarget target) const override;
 
     protected:
         [[nodiscard]]
@@ -38,6 +38,12 @@ namespace cs::semantic {
 
         [[nodiscard]]
         static rust::Result<SemanticPtr> compilation(const FlagsByName &flags, const Execution &execution);
+
+        [[nodiscard]]
+        virtual rust::Result<SemanticPtr> linking(const Execution &execution) const;
+
+        [[nodiscard]]
+        static rust::Result<SemanticPtr> linking(const FlagsByName &flags, const Execution &execution);
 
         static const FlagsByName FLAG_DEFINITION;
     };

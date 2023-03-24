@@ -94,7 +94,14 @@ namespace {
         });
     }
 
-    bool linking(const CompilerFlags& flags)
+    bool is_linker(const CompilerFlags& flags)
+    {
+        return std::any_of(flags.begin(), flags.end(), [](const auto& flag) {
+            return (flag.type == CompilerFlagType::LINKER_OBJECT_FILE);
+        });
+    }
+
+    bool has_linker(const CompilerFlags& flags)
     {
         return std::none_of(flags.begin(), flags.end(), [](auto flag) {
             return (flag.type == CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING);
@@ -103,12 +110,14 @@ namespace {
 
     std::tuple<
             Arguments,
-            std::vector<fs::path>,
-            std::optional<fs::path>
+            std::list<fs::path>,
+            std::optional<fs::path>,
+            std::list<fs::path>
     > split(const CompilerFlags &flags) {
         Arguments arguments;
-        std::vector<fs::path> sources;
+        std::list<fs::path> sources;
         std::optional<fs::path> output;
+        std::list<fs::path> object_files;
 
         for (const auto &flag : flags) {
             switch (flag.type) {
@@ -122,6 +131,11 @@ namespace {
                     output = std::make_optional(std::move(candidate));
                     break;
                 }
+                case CompilerFlagType::LINKER_OBJECT_FILE: {
+                    auto candidate = fs::path(flag.arguments.front());
+                    object_files.emplace_back(std::move(candidate));
+                    break;
+                }
                 case CompilerFlagType::LINKER:
                 case CompilerFlagType::PREPROCESSOR_MAKE:
                 case CompilerFlagType::DIRECTORY_SEARCH_LINKER:
@@ -132,7 +146,7 @@ namespace {
                 }
             }
         }
-        return std::make_tuple(arguments, sources, output);
+        return std::make_tuple(arguments, sources, output, object_files);
     }
 }
 
@@ -242,9 +256,18 @@ namespace cs::semantic {
             {"--",                 {MatchInstruction::PREFIX,                           CompilerFlagType::OTHER}},
     };
 
-    rust::Result<SemanticPtr> ToolGcc::recognize(const Execution &execution) const {
+    rust::Result<SemanticPtr> ToolGcc::recognize(const Execution &execution, const BuildTarget target) const {
         if (is_compiler_call(execution.executable)) {
-            return compilation(execution);
+            switch (target) {
+                case BuildTarget::COMPILER: {
+                    return compilation(execution);
+                    break;
+                }
+                case BuildTarget::LINKER: {
+                    return linking(execution);
+                    break;
+                }
+            }
         }
         return rust::Ok(SemanticPtr());
     }
@@ -291,24 +314,97 @@ namespace cs::semantic {
                         return rust::Ok(std::move(result));
                     }
 
-                    auto[arguments, sources, output] = split(flags);
-                    // Validate: must have source files.
+                    auto[arguments, sources, output, object_files] = split(flags);
                     if (sources.empty()) {
                         return rust::Err(std::runtime_error("Source files not found for compilation."));
                     }
-                    // TODO: introduce semantic type for linking
-                    if (linking(flags)) {
-                        arguments.insert(arguments.begin(), "-c");
+                    if (not object_files.empty()) {
+                        return rust::Err(std::runtime_error("Linker object files found for compilation."));
                     }
 
-                    SemanticPtr result = std::make_shared<Compile>(
+                    if (has_linker(flags)) {
+                        arguments.insert(arguments.begin(), "-c");
+
+                        SemanticPtr result = std::make_shared<Compile>(
                             execution.working_dir,
                             execution.executable,
                             std::move(arguments),
                             std::move(sources),
-                            std::move(output)
+                            std::move(output),
+                            true
+                        );
+                        return rust::Ok(std::move(result));
+                    }
+
+                    SemanticPtr result = std::make_shared<Compile>(
+                        execution.working_dir,
+                        execution.executable,
+                        std::move(arguments),
+                        std::move(sources),
+                        std::move(output),
+                        false
                     );
                     return rust::Ok(std::move(result));
+                });
+    }
+
+    rust::Result<SemanticPtr> ToolGcc::linking(const Execution &execution) const {
+        return linking(FLAG_DEFINITION, execution);
+    }
+
+    rust::Result<SemanticPtr> ToolGcc::linking(const FlagsByName &flags, const Execution &execution) {
+        const auto &parser =
+                Repeat(
+                        OneOf(
+                                FlagParser(flags),
+                                SourceMatcher(),
+                                EverythingElseFlagMatcher()
+                        )
+                );
+
+        const Arguments &input_arguments = create_argument_list(execution);
+        return parse(parser, input_arguments)
+                .and_then<SemanticPtr>([&execution](auto flags) -> rust::Result<SemanticPtr> {
+                    if (is_compiler_query(flags)) {
+                        SemanticPtr result = std::make_shared<QueryCompiler>();
+                        return rust::Ok(std::move(result));
+                    }
+                    if (is_prerpocessor(flags)) {
+                        SemanticPtr result = std::make_shared<Preprocess>();
+                        return rust::Ok(std::move(result));
+                    }
+
+                    auto[arguments, sources, output, object_files] = split(flags);
+
+                    if (is_linker(flags)) {
+                        if (not sources.empty()) {
+                            return rust::Err(std::runtime_error("Source files found for linking."));
+                        }
+
+                        SemanticPtr result = std::make_shared<Link>(
+                            execution.working_dir,
+                            execution.executable,
+                            std::move(arguments),
+                            std::move(object_files),
+                            std::move(output),
+                            false
+                        );
+                        return rust::Ok(std::move(result));
+                    }
+
+                    if (has_linker(flags)) {
+                        SemanticPtr result = std::make_shared<Link>(
+                            execution.working_dir,
+                            execution.executable,
+                            std::move(arguments),
+                            std::move(sources),
+                            std::move(output),
+                            true
+                        );
+                        return rust::Ok(std::move(result));
+                    }
+
+                    return rust::Ok(SemanticPtr());
                 });
     }
 }
