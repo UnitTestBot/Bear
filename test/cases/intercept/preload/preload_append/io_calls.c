@@ -1,6 +1,6 @@
 // REQUIRES: preload, shell, dynamic-shell
 // RUN: %{compile} '-D_FILE="%t.state"' -fpic -shared -o %t.so %s
-// RUN: env LD_PRELOAD=%t.so %{intercept} --verbose --output %t.json -- %{shell} -c %{true}
+// RUN: env LD_PRELOAD=%t.so %{intercept} --verbose --output-compile %t.json -- %{shell} -c %{true}
 // RUN: assert_intercepted %t.json count -ge 2
 // RUN: assert_intercepted %t.json contains -arguments %{shell} -c %{true}
 // RUN: assert_intercepted %t.json contains -program %{true} -arguments %{true}

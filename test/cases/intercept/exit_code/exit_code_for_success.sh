@@ -1,3 +1,3 @@
 #!/usr/bin/env sh
 
-# RUN: %{intercept} --verbose --output %t.events.json -- %{true}
+# RUN: %{intercept} --verbose --output-compile %t.events.json -- %{true}

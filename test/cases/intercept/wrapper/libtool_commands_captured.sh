@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 # REQUIRES: shell, libtool
-# RUN: %{intercept} --force-wrapper --verbose --output %t.json -- %{shell} %s
+# RUN: %{intercept} --force-wrapper --verbose --output-compile %t.json -- %{shell} %s
 # RUN: assert_intercepted %t.json count -ge 4
 # RUN: assert_intercepted %t.json contains -program %{c_compiler} -arguments %{c_compiler} -g -O -c main.c -o main.o
 # RUN: assert_intercepted %t.json contains -program %{c_compiler} -arguments %{c_compiler} -g -O -c hello.c -o hello.o
