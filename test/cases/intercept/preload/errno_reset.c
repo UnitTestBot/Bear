@@ -1,6 +1,6 @@
 // REQUIRES: preload
 // RUN: %{compile} -o %t %s
-// RUN: %{intercept} --verbose --output-compile %t.json -- %t
+// RUN: %{intercept} --verbose --output %t.json -- %t
 
 #include <stdlib.h>
 #include <errno.h>

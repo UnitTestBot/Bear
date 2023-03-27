@@ -37,6 +37,14 @@ namespace {
         return result;
     }
 
+    std::list<fs::path> abspath(const std::list<fs::path> &files, const fs::path &working_dir) {
+        std::list<fs::path> files_with_abspath;
+        for (const auto& file : files) {
+            files_with_abspath.push_back(abspath(file, working_dir));
+        }
+        return files_with_abspath;
+    }
+
     std::list<fs::path> get_object_files(const std::list<fs::path>& files)
     {
         std::list<fs::path> object_files;
@@ -131,9 +139,8 @@ namespace cs::semantic {
     std::list<cs::Entry> Compile::into_entries() const {
         std::list<cs::Entry> results;
         for (const auto& source : sources) {
-            const auto relative_source = fs::relative(source, working_dir);
             cs::Entry result {
-                std::optional(relative_source),
+                std::optional(abspath(source, working_dir)),
                 std::nullopt,
                 working_dir,
                 (output && !with_linking)
@@ -146,7 +153,7 @@ namespace cs::semantic {
                 result.arguments.emplace_back("-o");
                 result.arguments.push_back(output.value().string());
             }
-            result.arguments.push_back(relative_source);
+            result.arguments.push_back(source);
 
             results.emplace_back(std::move(result));
         }
@@ -200,7 +207,7 @@ namespace cs::semantic {
 
         cs::Entry result {
             std::nullopt,
-            std::optional(real_object_files),
+            std::optional(abspath(real_object_files, working_dir)),
             working_dir,
             output ? std::optional(abspath(output.value(), working_dir)) : std::nullopt,
             { compiler.string() }
