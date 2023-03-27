@@ -48,7 +48,7 @@ namespace {
             assert(entry.file.has_value() || entry.files.has_value());
 
             const auto check = [this](const fs::path &file) -> bool {
-                return to_include(file) && !to_exclude(file);
+                return exists(file) && to_include(file) && !to_exclude(file);
             };
 
             if (entry.file.has_value()) {
