@@ -185,20 +185,17 @@ namespace {
         std::list<cs::Entry> &output_link
     ) {
         for (const auto &event : *events) {
+            const auto get_entries = [](const auto &semantic) -> std::list<cs::Entry> {
+                const auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
+                return (candidate != nullptr) ? candidate->into_entries() : std::list<cs::Entry>();
+            };
+
             const auto entries_compile = build.recognize(event, cs::semantic::BuildTarget::COMPILER)
-                .map<std::list<cs::Entry>>([](const auto &semantic) -> std::list<cs::Entry> {
-                    const auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
-                    return (candidate != nullptr) ? candidate->into_entries() : std::list<cs::Entry>();
-                })
-                .unwrap_or({});
+                .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
             std::copy(entries_compile.begin(), entries_compile.end(), std::back_inserter(output_compile));
 
             const auto entries_link = build.recognize(event, cs::semantic::BuildTarget::LINKER)
-                .map<std::list<cs::Entry>>([](const auto &semantic) -> std::list<cs::Entry> {
-                    const auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
-                    return (candidate != nullptr) ? candidate->into_entries() : std::list<cs::Entry>();
-                })
-                .unwrap_or({});
+                .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
             std::copy(entries_link.begin(), entries_link.end(), std::back_inserter(output_link));
         }
         return std::pair(output_compile.size(), output_link.size());
@@ -210,11 +207,9 @@ namespace cs {
     rust::Result<int> Command::execute() const {
         cs::CompilationDatabase output_compile(configuration_.output.format, configuration_.output.content);
         cs::CompilationDatabase output_link(configuration_.output.format, configuration_.output.content);
-
         std::list<cs::Entry> entries_compile;
         std::list<cs::Entry> entries_link;
 
-//         get current compilations from the input.
         return db::EventsDatabaseReader::from(arguments_.input)
             .map<std::pair<size_t, size_t>>([this, &entries_compile, &entries_link](const auto &commands) {
                 cs::semantic::Build build(configuration_.compilation);
@@ -222,14 +217,13 @@ namespace cs {
             })
             .and_then<std::pair<size_t, size_t>>([this, &output_compile, &output_link, &entries_compile, &entries_link](std::pair<size_t, size_t> new_entries_counts) {
                 spdlog::debug("compilation entries created. [size: {}]", new_entries_counts.first);
-                spdlog::debug("link entries created. [size: {}]", new_entries_counts.second);
+                spdlog::debug("linking entries created. [size: {}]", new_entries_counts.second);
 
                 // read back the current content and extend with the new elements.
                 if (arguments_.append) {
                     auto result_compile = output_compile.from_json(arguments_.output_compile, entries_compile)
                         .template map<size_t>([&new_entries_counts](auto old_entries_count) {
                             spdlog::debug("compilation entries have read. [size: {}]", old_entries_count);
-                            new_entries_counts.first += old_entries_count;
                             return new_entries_counts.first + old_entries_count;
                         });
                     if (result_compile.is_err()) {
@@ -238,41 +232,39 @@ namespace cs {
 
                     auto result_link = output_link.from_json(arguments_.output_link, entries_link)
                         .template map<size_t>([&new_entries_counts](auto old_entries_count) {
-                            spdlog::debug("link entries have read. [size: {}]", old_entries_count);
-                            new_entries_counts.second += old_entries_count;
+                            spdlog::debug("linking entries have read. [size: {}]", old_entries_count);
                             return new_entries_counts.second + old_entries_count;
                         });
                     if (result_link.is_err()) {
                         return rust::Result<std::pair<size_t, size_t>>(rust::Err(result_link.unwrap_err()));
                     }
-                }
 
+                    return rust::Result<std::pair<size_t, size_t>>(rust::Ok(std::pair(result_compile.unwrap(), result_link.unwrap())));
+                }
                 return rust::Result<std::pair<size_t, size_t>>(rust::Ok(new_entries_counts));
             })
             .and_then<std::pair<size_t, size_t>>([this, &output_compile, &output_link, &entries_compile, &entries_link](const auto &entries_counts) {
                 // write the entries into the output file.
                 spdlog::debug("compilation entries to output. [size: {}]", entries_counts.first);
-                spdlog::debug("link entries to output. [size: {}]", entries_counts.second);
+                spdlog::debug("linking entries to output. [size: {}]", entries_counts.second);
 
                 const fs::path temporary_file_compile(arguments_.output_compile.string() + ".tmp");
-                const fs::path temporary_file_link(arguments_.output_link.string() + ".tmp");
-
                 auto result_compile = output_compile.to_json(temporary_file_compile, entries_compile);
-                auto result_link = output_link.to_json(temporary_file_link, entries_link);
-
                 if (not rename_file(temporary_file_compile, arguments_.output_compile)) {
                     return rust::Result<std::pair<size_t, size_t>>(
                         rust::Err(std::runtime_error(fmt::format("Failed to rename file: {}", arguments_.output_compile)))
                     );
                 }
+                if (result_compile.is_err()) {
+                    return rust::Result<std::pair<size_t, size_t>>(rust::Err(result_compile.unwrap_err()));
+                }
+
+                const fs::path temporary_file_link(arguments_.output_link.string() + ".tmp");
+                auto result_link = output_link.to_json(temporary_file_link, entries_link);
                 if (not rename_file(temporary_file_link, arguments_.output_link)) {
                     return rust::Result<std::pair<size_t, size_t>>(
                         rust::Err(std::runtime_error(fmt::format("Failed to rename file: {}", arguments_.output_link)))
                     );
-                }
-
-                if (result_compile.is_err()) {
-                    return rust::Result<std::pair<size_t, size_t>>(rust::Err(result_compile.unwrap_err()));
                 }
                 if (result_link.is_err()) {
                     return rust::Result<std::pair<size_t, size_t>>(rust::Err(result_link.unwrap_err()));;
@@ -285,8 +277,7 @@ namespace cs {
             .map<int>([](auto size) {
                 // just map to success exit code if it was successful.
                 spdlog::debug("compilation entries written. [size: {}]", size.first);
-                spdlog::debug("link entries written. [size: {}]", size.second);
-
+                spdlog::debug("linking entries written. [size: {}]", size.second);
                 return EXIT_SUCCESS;
             });
     }

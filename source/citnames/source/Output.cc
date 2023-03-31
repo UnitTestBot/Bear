@@ -215,6 +215,11 @@ namespace cs {
         if (entry.files.has_value() && entry.files.value().empty()) {
             throw std::runtime_error("Field 'files' is empty list.");
         }
+        if (entry.files.has_value() && not entry.files.value().empty() &&
+            std::any_of(entry.files.value().begin(), entry.files.value().end(),
+                [](const auto& file) { return file.empty(); })) {
+            throw std::runtime_error("One of 'files' is empty string.");
+        }
 
         if (entry.directory.empty()) {
             throw std::runtime_error("Field 'directory' is empty string.");
@@ -233,17 +238,13 @@ namespace cs {
         assert(rhs.file.has_value() || rhs.files.has_value());
         if (rhs.file.has_value()) {
             json["file"] = rhs.file.value();
-        }
-        if (rhs.files.has_value()) {
+        } else if (rhs.files.has_value()) {
             json["files"] = rhs.files.value();
         }
-
         json["directory"] = rhs.directory;
-
         if (!format.drop_output_field && rhs.output.has_value()) {
             json["output"] = rhs.output.value();
         }
-
         if (format.command_as_array) {
             json["arguments"] = rhs.arguments;
         } else {
@@ -254,13 +255,14 @@ namespace cs {
     }
 
     void from_json(const nlohmann::json &j, Entry &entry) {
-        assert(j.contains("file") || j.contains("files"));
-        if (j.contains("file")) {
+        const auto contains_file = j.contains("file");
+        const auto contains_files = j.contains("files");
+        assert(contains_file || contains_files);
+        if (contains_file) {
             std::string file;
             j.at("file").get_to(file);
             entry.file.emplace(file);
-        }
-        if (j.contains("files")) {
+        } else if (contains_files) {
             std::list<std::string> files;
             j.at("files").get_to(files);
             std::list<fs::path> files_paths;
