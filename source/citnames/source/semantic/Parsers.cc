@@ -21,6 +21,8 @@
 
 #include <set>
 
+#include <iostream>
+
 namespace {
 
     std::string_view take_extension(const std::string_view &file) {
@@ -200,29 +202,20 @@ namespace cs::semantic {
             if (auto result = check_equal(key, *candidate); result) {
                 return result;
             }
-            // check if the argument is allowed to stick to the flag
-            if (auto result = check_partial(key, *candidate); result) {
-                return result;
-            }
         }
-        // partial match is less likely to be a few steps away from the lower bound,
-        // therefore search the whole flag list again.
 
-        size_t prefix_length_best = 0;
-        std::optional<std::string> candidate_best = std::nullopt;
-
+        std::optional<std::string> candidate_longest = std::nullopt;
         for (const auto &[candidate, info] : flags_) {
             if (const auto& extra = split_extra(candidate, key); extra) {
                 const size_t prefix_length = key.size() - extra.value().size();
-                if (prefix_length > prefix_length_best) {
-                    prefix_length_best = prefix_length;
-                    candidate_best = std::optional<std::string>(std::string(candidate));
+                if (!candidate_longest || (prefix_length > candidate_longest.value().size())) {
+                    candidate_longest = std::make_optional(std::string(candidate));
                 }
             }
         }
 
-        return (candidate_best.has_value())
-            ? check_partial(key, *(flags_.find(candidate_best.value())))
+        return (candidate_longest.has_value())
+            ? check_partial(key, *(flags_.find(candidate_longest.value())))
             : std::nullopt;
     }
 
@@ -239,26 +232,24 @@ namespace cs::semantic {
     std::optional<FlagParser::Match>
     FlagParser::check_partial(const std::string_view &key, const FlagsByName::value_type &candidate) {
         const auto &flag_definition = candidate.second;
-        if (const auto &extra = split_extra(candidate.first, key); extra) {
-            const auto flag_matching = classify_flag_matching(extra.value());
-            switch (flag_matching) {
-                case FlagMatch::GLUED:
-                    if (is_glue_allowed(flag_definition.match)) {
-                        const size_t decrease = is_prefix_match(flag_definition.match) ? 0 : 1;
-                        const size_t count = count_of_arguments(flag_definition.match) - decrease;
-                        return std::make_optional(std::make_tuple(count, flag_definition.type));
-                    }
-                    break;
-                case FlagMatch::GLUED_WITH_EQ:
-                    if (is_glue_with_equal_allowed(flag_definition.match)) {
-                        const size_t count = count_of_arguments(flag_definition.match) - 1;
-                        return std::make_optional(std::make_tuple(count, flag_definition.type));
-                    }
-                    break;
-                default:
-                    // This should not happen here. Exact match is already filtered out.
-                    __builtin_unreachable();
-            }
+        const auto flag_matching = classify_flag_matching(key.substr(candidate.first.size()));
+        switch (flag_matching) {
+            case FlagMatch::GLUED:
+                if (is_glue_allowed(flag_definition.match)) {
+                    const size_t decrease = is_prefix_match(flag_definition.match) ? 0 : 1;
+                    const size_t count = count_of_arguments(flag_definition.match) - decrease;
+                    return std::make_optional(std::make_tuple(count, flag_definition.type));
+                }
+                break;
+            case FlagMatch::GLUED_WITH_EQ:
+                if (is_glue_with_equal_allowed(flag_definition.match)) {
+                    const size_t count = count_of_arguments(flag_definition.match) - 1;
+                    return std::make_optional(std::make_tuple(count, flag_definition.type));
+                }
+                break;
+            default:
+                // This should not happen here. Exact match is already filtered out.
+                __builtin_unreachable();
         }
         return std::nullopt;
     }

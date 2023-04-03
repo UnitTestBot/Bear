@@ -139,20 +139,21 @@ namespace cs::semantic {
     std::list<cs::Entry> Compile::into_entries() const {
         std::list<cs::Entry> results;
         for (const auto& source : sources) {
+            const fs::path real_output = (output && !with_linking)
+                ? output.value()
+                : fs::path(source.string() + ".o");
+
             cs::Entry result {
-                std::optional(abspath(source, working_dir)),
-                std::nullopt,
+                abspath(source, working_dir),
+                std::list<fs::path>(),
                 working_dir,
-                (output && !with_linking)
-                    ? std::optional(abspath(output.value(), working_dir))
-                    : std::optional(static_cast<fs::path>(abspath(source, working_dir).string() + ".o")),
+                abspath(real_output, working_dir),
                 { compiler.string() }
             };
+
             std::copy(flags.begin(), flags.end(), std::back_inserter(result.arguments));
-            if (output) {
-                result.arguments.emplace_back("-o");
-                result.arguments.push_back(output.value().string());
-            }
+            result.arguments.emplace_back("-o");
+            result.arguments.push_back(real_output);
             result.arguments.push_back(source);
 
             results.emplace_back(std::move(result));
@@ -206,12 +207,13 @@ namespace cs::semantic {
             : object_files;
 
         cs::Entry result {
-            std::nullopt,
-            std::optional(abspath(real_object_files, working_dir)),
+            fs::path(),
+            abspath(real_object_files, working_dir),
             working_dir,
             output ? std::optional(abspath(output.value(), working_dir)) : std::nullopt,
             { compiler.string() }
         };
+
         std::copy(flags.begin(), flags.end(), std::back_inserter(result.arguments));
         if (output) {
             result.arguments.emplace_back("-o");
@@ -219,9 +221,6 @@ namespace cs::semantic {
         }
         std::copy(real_object_files.begin(), real_object_files.end(), std::back_inserter(result.arguments));
 
-        std::list<cs::Entry> results;
-        results.emplace_back(std::move(result));
-
-        return results;
+        return std::list{result};
     }
 }

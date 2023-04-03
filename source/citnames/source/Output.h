@@ -45,8 +45,8 @@ namespace cs {
     // but that is an optional field. So, in this sense this is not
     // really a database with keys.
     struct Entry {
-        std::optional<fs::path> file;
-        std::optional<std::list<fs::path>> files;
+        fs::path file;
+        std::list<fs::path> files;
         fs::path directory;
         std::optional<fs::path> output;
         std::list<std::string> arguments;
