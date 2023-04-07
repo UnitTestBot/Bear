@@ -149,6 +149,14 @@ namespace {
         return result;
     }
 
+    void customize_configuration(cs::Configuration& configuration, const flags::Arguments &args) {
+        auto with_link = args.as_bool(cmd::citnames::FLAG_WITH_LINK).unwrap_or(false);
+        if (with_link) {
+            configuration.output.content.without_existence_check = true;
+            configuration.output.content.without_duplicate_filter = true;
+        }
+    }
+
     rust::Result<cs::Configuration>
     into_configuration(const flags::Arguments &args, const sys::env::Vars &environment) {
         auto config_arg = args.as_string(cmd::citnames::FLAG_CONFIG);
@@ -176,18 +184,13 @@ namespace {
                             update_compilers_to_recognize(config.compilation.compilers_to_recognize, env_compilers);
                     return config;
                 })
+                .map<cs::Configuration>([&args](auto config) {
+                    customize_configuration(config, args);
+                    return config;
+                })
                 .on_success([](const auto &config) {
                     spdlog::debug("Configuration: {}", config);
                 });
-    }
-
-    void customize_configuration(cs::Configuration& configuration, const flags::Arguments &args) {
-//        configuration.output.content.without_existence_check = true;
-
-        auto with_link = args.as_bool(cmd::citnames::FLAG_WITH_LINK).unwrap_or(false);
-        if (with_link) {
-            configuration.output.content.without_duplicate_filter = true;
-        }
     }
 
     size_t transform(
@@ -307,11 +310,7 @@ namespace cs {
         auto environment = sys::env::from(const_cast<const char **>(envp));
 
         auto arguments = into_arguments(args);
-        auto configuration = into_configuration(args, environment)
-            .map<cs::Configuration>([&args](auto config) {
-                customize_configuration(config, args);
-                return config;
-            });
+        auto configuration = into_configuration(args, environment);
 
         return rust::merge(arguments, configuration)
                 .map<ps::CommandPtr>([](auto tuples) {

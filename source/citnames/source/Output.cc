@@ -21,13 +21,11 @@
 #include "libshell/Command.h"
 
 #include <algorithm>
-#include <numeric>
 #include <iomanip>
 #include <fstream>
 #include <memory>
 #include <unordered_set>
 #include <utility>
-#include <optional>
 
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
@@ -79,10 +77,7 @@ namespace {
 
     private:
         [[nodiscard]] inline bool check(const fs::path &file) const {
-            if (config.without_existence_check) {
-                return to_include(file) && !to_exclude(file);
-            }
-            return exists(file) && to_include(file) && !to_exclude(file);
+            return (config.without_existence_check || exists(file)) && to_include(file) && !to_exclude(file);
         }
 
         [[nodiscard]] inline bool exists(const fs::path &file) const {
@@ -141,24 +136,11 @@ namespace {
         std::unordered_set<size_t> hashes;
     };
 
-    size_t hash_files(const cs::Entry &entry) {
-        auto string_hasher = std::hash<std::string>{};
-
-        validate_files(entry);
-        return string_hasher(std::accumulate(
-            entry.files.begin(),
-            entry.files.end(),
-            entry.file,
-            [](const auto &res, const auto &add) {
-                return res.string() + add.string();
-            }
-        ));
-    }
-
     struct FileDuplicateFilter : public DuplicateFilter {
         private:
             size_t hash(const cs::Entry &entry) const override {
-                return hash_files(entry);
+                auto string_hasher = std::hash<std::string>{};
+                return string_hasher(entry.file);
             }
     };
 
@@ -167,7 +149,7 @@ namespace {
             size_t hash(const cs::Entry &entry) const override {
                 auto string_hasher = std::hash<std::string>{};
 
-                auto hash = hash_files(entry);
+                auto hash = string_hasher(entry.file);
                 if (entry.output) {
                     hash = hash_combine(hash, string_hasher(*entry.output));
                 }
@@ -180,7 +162,7 @@ namespace {
             size_t hash(const cs::Entry &entry) const override {
                 auto string_hasher = std::hash<std::string>{};
 
-                auto hash = hash_files(entry);
+                auto hash = string_hasher(entry.file);
                 if (entry.output) {
                     hash = hash_combine(hash, string_hasher(*entry.output));
                 }
