@@ -291,7 +291,7 @@ namespace cs::semantic {
     }
 
     bool ToolGcc::is_linker_call(const fs::path& program) const {
-        static const auto pattern = std::regex(R"(^(ld|lld|gold)*)");
+        static const auto pattern = std::regex(R"((ld|lld|gold|ar)*)");
         std::cmatch m;
         return is_compiler_call(program) || std::regex_match(program.filename().c_str(), m, pattern);
     }
