@@ -34,6 +34,9 @@ namespace cs::semantic {
         virtual bool is_compiler_call(const fs::path& program) const;
 
         [[nodiscard]]
+        virtual bool is_linker_call(const fs::path& program) const;
+
+        [[nodiscard]]
         virtual rust::Result<SemanticPtr> compilation(const Execution &execution) const;
 
         [[nodiscard]]

@@ -79,6 +79,9 @@ namespace {
 
     private:
         [[nodiscard]] inline bool check(const fs::path &file) const {
+            if (config.without_existence_check) {
+                return to_include(file) && !to_exclude(file);
+            }
             return exists(file) && to_include(file) && !to_exclude(file);
         }
 
@@ -312,7 +315,8 @@ namespace cs {
             size_t count = 0;
             nlohmann::json json = nlohmann::json::array();
             for (const auto &entry : entries) {
-                if (content_filter.apply(entry) && duplicate_filter->apply(entry)) {
+                const auto filter = content_filter.apply(entry) && (content.without_duplicate_filter || duplicate_filter->apply(entry));
+                if (filter) {
                     auto json_entry = cs::to_json(entry, format);
                     json.emplace_back(std::move(json_entry));
                     ++count;

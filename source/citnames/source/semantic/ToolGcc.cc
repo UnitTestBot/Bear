@@ -257,16 +257,18 @@ namespace cs::semantic {
     };
 
     rust::Result<SemanticPtr> ToolGcc::recognize(const Execution &execution, const BuildTarget target) const {
-        if (is_compiler_call(execution.executable)) {
-            switch (target) {
-                case BuildTarget::COMPILER: {
+        switch (target) {
+            case BuildTarget::COMPILER: {
+                if (is_compiler_call(execution.executable)) {
                     return compilation(execution);
-                    break;
                 }
-                case BuildTarget::LINKER: {
+                break;
+            }
+            case BuildTarget::LINKER: {
+                if (is_linker_call(execution.executable)) {
                     return linking(execution);
-                    break;
                 }
+                break;
             }
         }
         return rust::Ok(SemanticPtr());
@@ -286,6 +288,12 @@ namespace cs::semantic {
 
         std::cmatch m;
         return std::regex_match(program.filename().c_str(), m, pattern);
+    }
+
+    bool ToolGcc::is_linker_call(const fs::path& program) const {
+        static const auto pattern = std::regex(R"(^(ld|lld|gold)*)");
+        std::cmatch m;
+        return is_compiler_call(program) || std::regex_match(program.filename().c_str(), m, pattern);
     }
 
     rust::Result<SemanticPtr> ToolGcc::compilation(const Execution &execution) const {
@@ -322,18 +330,13 @@ namespace cs::semantic {
                         return rust::Err(std::runtime_error("Linker object files found for compilation."));
                     }
 
+                    bool with_linking;
                     if (has_linker(flags)) {
+                        with_linking = true;
                         arguments.insert(arguments.begin(), "-c");
-
-                        SemanticPtr result = std::make_shared<Compile>(
-                            execution.working_dir,
-                            execution.executable,
-                            std::move(arguments),
-                            std::move(sources),
-                            std::move(output),
-                            true
-                        );
-                        return rust::Ok(std::move(result));
+                    }
+                    else {
+                        with_linking = false;
                     }
 
                     SemanticPtr result = std::make_shared<Compile>(
@@ -342,7 +345,7 @@ namespace cs::semantic {
                         std::move(arguments),
                         std::move(sources),
                         std::move(output),
-                        false
+                        with_linking
                     );
                     return rust::Ok(std::move(result));
                 });

@@ -39,6 +39,7 @@ namespace cs {
         fs::path output_compile;
         fs::path output_link;
         bool append;
+        bool with_link;
     };
 
     struct Command : ps::Command {

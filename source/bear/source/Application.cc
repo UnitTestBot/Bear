@@ -69,6 +69,7 @@ namespace {
     rust::Result<sys::Process::Builder>
     prepare_citnames(const flags::Arguments &arguments, const sys::env::Vars &environment, const fs::path &input) {
         auto program = arguments.as_string(cmd::bear::FLAG_BEAR);
+        auto with_link = arguments.as_bool(cmd::citnames::FLAG_WITH_LINK).unwrap_or(false);
         auto output_compile = arguments.as_string(cmd::citnames::FLAG_OUTPUT_COMPILE);
         auto output_link = arguments.as_string(cmd::citnames::FLAG_OUTPUT_LINK);
         auto config = arguments.as_string(cmd::citnames::FLAG_CONFIG);
@@ -76,7 +77,7 @@ namespace {
         auto verbose = arguments.as_bool(flags::VERBOSE).unwrap_or(false);
 
         return rust::merge(program, output_compile, output_link)
-                .map<sys::Process::Builder>([&environment, &input, &config, &append, &verbose](auto tuple) {
+                .map<sys::Process::Builder>([&environment, &input, &config, &append, &verbose, &with_link](auto tuple) {
                     const auto&[program, output_compile, output_link] = tuple;
 
                     auto builder = sys::Process::Builder(program)
@@ -90,6 +91,9 @@ namespace {
                             .add_argument(cmd::citnames::FLAG_RUN_CHECKS);
                     if (append) {
                         builder.add_argument(cmd::citnames::FLAG_APPEND);
+                    }
+                    if (with_link) {
+                        builder.add_argument(cmd::citnames::FLAG_WITH_LINK);
                     }
                     if (config.is_ok()) {
                         builder.add_argument(cmd::citnames::FLAG_CONFIG).add_argument(config.unwrap());
@@ -159,6 +163,7 @@ namespace bear {
 
             const flags::Parser citnames_parser("citnames", cmd::VERSION, {
                 {cmd::citnames::FLAG_INPUT,          {1, false, "path of the input file",                    {cmd::intercept::DEFAULT_OUTPUT},        std::nullopt}},
+                {cmd::citnames::FLAG_WITH_LINK,      {0, false, "whether to create a link base",             std::nullopt,                            std::nullopt}},
                 {cmd::citnames::FLAG_OUTPUT_COMPILE, {1, false, "path of the result compile file",           {cmd::citnames::DEFAULT_OUTPUT_COMPILE}, std::nullopt}},
                 {cmd::citnames::FLAG_OUTPUT_LINK,    {1, false, "path of the result link file",              {cmd::citnames::DEFAULT_OUTPUT_LINK},    std::nullopt}},
                 {cmd::citnames::FLAG_CONFIG,         {1, false, "path of the config file",                   std::nullopt,                            std::nullopt}},
@@ -167,6 +172,7 @@ namespace bear {
             });
 
             const flags::Parser parser("bear", cmd::VERSION, {intercept_parser, citnames_parser}, {
+                {cmd::citnames::FLAG_WITH_LINK,      {0, false, "whether to create a link base",             std::nullopt,                            std::nullopt}},
                 {cmd::citnames::FLAG_OUTPUT_COMPILE, {1,  false, "path of the result compile file",          {cmd::citnames::DEFAULT_OUTPUT_COMPILE}, std::nullopt}},
                 {cmd::citnames::FLAG_OUTPUT_LINK,    {1,  false, "path of the result link file",             {cmd::citnames::DEFAULT_OUTPUT_LINK},    std::nullopt}},
                 {cmd::citnames::FLAG_APPEND,         {0,  false, "append result to an existing output file", std::nullopt,                            ADVANCED_GROUP}},

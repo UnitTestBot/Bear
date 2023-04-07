@@ -185,16 +185,18 @@ namespace cs::semantic {
     { }
 
     rust::Result<SemanticPtr> ToolClang::recognize(const Execution &execution, const BuildTarget target) const {
-        if (is_compiler_call(execution.executable)) {
-            switch (target) {
-                case BuildTarget::COMPILER: {
+        switch (target) {
+            case BuildTarget::COMPILER: {
+                if (is_compiler_call(execution.executable)) {
                     return ToolGcc::compilation(ToolClang::flag_definition, execution);
-                    break;
                 }
-                case BuildTarget::LINKER: {
+                break;
+            }
+            case BuildTarget::LINKER: {
+                if (is_linker_call(execution.executable)){
                     return ToolGcc::linking(ToolClang::flag_definition, execution);
-                    break;
                 }
+                break;
             }
         }
         return rust::Ok(SemanticPtr());

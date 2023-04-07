@@ -104,17 +104,18 @@ namespace {
         auto input = args.as_string(cmd::citnames::FLAG_INPUT);
         auto output_compile = args.as_string(cmd::citnames::FLAG_OUTPUT_COMPILE);
         auto output_link = args.as_string(cmd::citnames::FLAG_OUTPUT_LINK);
-        auto append = args.as_bool(cmd::citnames::FLAG_APPEND)
-                .unwrap_or(false);
+        auto append = args.as_bool(cmd::citnames::FLAG_APPEND).unwrap_or(false);
+        auto with_link = args.as_bool(cmd::citnames::FLAG_WITH_LINK).unwrap_or(false);
 
         return rust::merge(input, output_compile, output_link)
-                .map<cs::Arguments>([&append](auto tuple) {
+                .map<cs::Arguments>([&append, &with_link](auto tuple) {
                     const auto&[input, output_compile, output_link] = tuple;
                     return cs::Arguments{
                             fs::path(input),
                             fs::path(output_compile),
                             fs::path(output_link),
                             append,
+                            with_link
                     };
                 })
                 .and_then<cs::Arguments>([](auto arguments) -> rust::Result<cs::Arguments> {
@@ -127,7 +128,9 @@ namespace {
                             arguments.input,
                             arguments.output_compile,
                             arguments.output_link,
-                            (arguments.append && is_exists(arguments.output_compile) && is_exists(arguments.output_link)),
+                            (arguments.append && is_exists(arguments.output_compile)
+                                && (!arguments.with_link || is_exists(arguments.output_link))),
+                            arguments.with_link
                     });
                 });
     }
@@ -178,11 +181,21 @@ namespace {
                 });
     }
 
+    void customize_configuration(cs::Configuration& configuration, const flags::Arguments &args) {
+//        configuration.output.content.without_existence_check = true;
+
+        auto with_link = args.as_bool(cmd::citnames::FLAG_WITH_LINK).unwrap_or(false);
+        if (with_link) {
+            configuration.output.content.without_duplicate_filter = true;
+        }
+    }
+
     size_t transform(
         cs::semantic::Build &build,
         const db::EventsDatabaseReader::Ptr& events,
         std::list<cs::Entry> &output_compile,
-        std::list<cs::Entry> &output_link
+        std::list<cs::Entry> &output_link,
+        const bool with_link
     ) {
         for (const auto &event : *events) {
             const auto get_entries = [](const auto &semantic) -> std::list<cs::Entry> {
@@ -194,9 +207,11 @@ namespace {
                 .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
             std::copy(entries_compile.begin(), entries_compile.end(), std::back_inserter(output_compile));
 
-            const auto entries_link = build.recognize(event, cs::semantic::BuildTarget::LINKER)
-                .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
-            std::copy(entries_link.begin(), entries_link.end(), std::back_inserter(output_link));
+            if (with_link) {
+                const auto entries_link = build.recognize(event, cs::semantic::BuildTarget::LINKER)
+                    .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
+                std::copy(entries_link.begin(), entries_link.end(), std::back_inserter(output_link));
+            }
         }
         return output_compile.size() + output_link.size();
     }
@@ -244,30 +259,36 @@ namespace cs {
         return db::EventsDatabaseReader::from(arguments_.input)
             .map<size_t>([this, &entries_compile, &entries_link](const auto &commands) {
                 cs::semantic::Build build(configuration_.compilation);
-                return transform(build, commands, entries_compile, entries_link);
+                return transform(build, commands, entries_compile, entries_link, arguments_.with_link);
             })
             .and_then<size_t>([this, &output_compile, &entries_compile](size_t new_entries_count) {
-                spdlog::debug("compilation and linking entries created. [size: {}]", new_entries_count);
+                spdlog::debug("entries created. [size: {}]", new_entries_count);
                 return complete_entries_from_json(output_compile, arguments_.output_compile,
                     entries_compile, new_entries_count, arguments_.append);
             })
             .and_then<size_t>([this, &output_link, &entries_link](size_t new_entries_count) {
-                return complete_entries_from_json(output_link, arguments_.output_link,
-                    entries_link, new_entries_count, arguments_.append);
+                if (arguments_.with_link) {
+                    return complete_entries_from_json(output_link, arguments_.output_link,
+                        entries_link, new_entries_count, arguments_.append);
+                }
+                return rust::Result<size_t>(rust::Ok(new_entries_count));
             })
             .and_then<size_t>([this, &output_compile, &entries_compile](const auto entries_count_to_output) {
-                spdlog::debug("compilation and linking entries to output. [size: {}]", entries_count_to_output);
+                spdlog::debug("entries to output. [size: {}]", entries_count_to_output);
                 return write_entries(output_compile, arguments_.output_compile, entries_compile);
             })
             .and_then<size_t>([this, &output_link, &entries_link](const auto compile_entries_wrote) {
-                const auto result_link = write_entries(output_link, arguments_.output_link, entries_link);
-                return (result_link.is_err())
-                    ? result_link
-                    : rust::Ok(result_link.unwrap() + compile_entries_wrote);
+                if (arguments_.with_link) {
+                    const auto result_link = write_entries(output_link, arguments_.output_link, entries_link);
+                    return (result_link.is_err())
+                           ? result_link
+                           : rust::Ok(result_link.unwrap() + compile_entries_wrote);
+                }
+                return rust::Result<size_t>(rust::Ok(compile_entries_wrote));
             })
             .map<int>([](auto size) {
                 // just map to success exit code if it was successful.
-                spdlog::debug("compilation and linking entries written. [size: {}]", size);
+                spdlog::debug("entries written. [size: {}]", size);
                 return EXIT_SUCCESS;
             });
     }
@@ -286,7 +307,11 @@ namespace cs {
         auto environment = sys::env::from(const_cast<const char **>(envp));
 
         auto arguments = into_arguments(args);
-        auto configuration = into_configuration(args, environment);
+        auto configuration = into_configuration(args, environment)
+            .map<cs::Configuration>([&args](auto config) {
+                customize_configuration(config, args);
+                return config;
+            });
 
         return rust::merge(arguments, configuration)
                 .map<ps::CommandPtr>([](auto tuples) {

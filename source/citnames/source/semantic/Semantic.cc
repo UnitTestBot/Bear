@@ -152,8 +152,10 @@ namespace cs::semantic {
             };
 
             std::copy(flags.begin(), flags.end(), std::back_inserter(result.arguments));
-            result.arguments.emplace_back("-o");
-            result.arguments.push_back(real_output);
+            if (output) {
+                result.arguments.emplace_back("-o");
+                result.arguments.push_back(real_output);
+            }
             result.arguments.push_back(source);
 
             results.emplace_back(std::move(result));
