@@ -79,7 +79,7 @@ namespace {
                 new Compile(
                         input.working_dir,
                         input.executable,
-                        {"-c", "source.c"},
+                        {"-c"},
                         {fs::path("source.c")},
                         {},
                         {fs::path("source.o")},
@@ -97,7 +97,7 @@ namespace {
     TEST(ToolGcc, output_filtered) {
         Execution input = {
                 "/usr/bin/cc",
-                {"cc", "-L.", "-lthing", "-o", "exe", "source.c"},
+                {"cc", "source.c", "-L.", "-lthing", "-o", "exe"},
                 "/home/user/project",
                 {},
         };
@@ -105,7 +105,7 @@ namespace {
                 new Compile(
                         input.working_dir,
                         input.executable,
-                        {"-c", "-L.", "-lthing", "source.c"},
+                        {"-c", "-L.", "-lthing"},
                         {fs::path("source.c")},
                         {},
                         {fs::path("exe")},
@@ -149,7 +149,7 @@ namespace {
                         input.working_dir,
                         input.executable,
                         {
-                                "-c", "source.c",
+                                "-c",
                                 "-I", "/usr/include/path1",
                                 "-I", "/usr/include/path2",
                                 "-I", ".",
@@ -180,7 +180,7 @@ namespace {
                 new Compile(
                         input.working_dir,
                         input.executable,
-                        {"-c", "source.c"},
+                        {"-c"},
                         {fs::path("source.c")},
                         {},
                         {fs::path("source")},
@@ -206,7 +206,7 @@ namespace {
                 new Compile(
                         input.working_dir,
                         input.executable,
-                        {"-c", "source_1.c", "source_2.c", "lib.o"},
+                        {"-c", "lib.o"},
                         {"source_1.c", "source_2.c"},
                         {"lib.o"},
                         {fs::path("source")},

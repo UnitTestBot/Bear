@@ -145,12 +145,13 @@ namespace cs::semantic {
                 { compiler.string() }
             };
 
-            // flags contains everything except output
+            // flags contains everything except output and sources
             std::copy(flags.begin(), flags.end(), std::back_inserter(result.arguments));
             if (output) {
                 result.arguments.emplace_back("-o");
                 result.arguments.push_back(real_output);
             }
+            result.arguments.push_back(source);
 
             results.emplace_back(std::move(result));
         }

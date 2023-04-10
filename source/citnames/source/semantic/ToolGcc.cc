@@ -106,13 +106,13 @@ namespace {
     std::tuple<
             Arguments,
             std::list<fs::path>,
-            std::optional<fs::path>,
-            std::list<fs::path>
-    > split(const CompilerFlags &flags) {
+            std::list<fs::path>,
+            std::optional<fs::path>
+    > split_compile(const CompilerFlags &flags) {
         Arguments arguments;
         std::list<fs::path> sources;
+        std::list<fs::path> libs;
         std::optional<fs::path> output;
-        std::list<fs::path> object_files_and_libs;
 
         for (const auto &flag : flags) {
             switch (flag.type) {
@@ -124,11 +124,11 @@ namespace {
                 case CompilerFlagType::SOURCE: {
                     auto candidate = fs::path(flag.arguments.front());
                     sources.emplace_back(std::move(candidate));
-                    break;
+                    continue;
                 }
                 case CompilerFlagType::LINKER_OBJECT_FILE: {
                     auto candidate = fs::path(flag.arguments.front());
-                    object_files_and_libs.emplace_back(candidate);
+                    libs.emplace_back(candidate);
                     break;
                 }
                 default: {
@@ -137,35 +137,45 @@ namespace {
             }
             std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments));
         }
-        return std::make_tuple(arguments, sources, output, object_files_and_libs);
+        return std::make_tuple(arguments, sources, libs, output);
     }
 
-    std::tuple<Arguments, std::list<fs::path>>
-    split_with_updating_sources(const CompilerFlags &flags) {
-        Arguments arguments_with_updated_sources;
+    std::tuple<
+            Arguments,
+            std::list<fs::path>,
+            std::optional<fs::path>,
+            size_t
+    > split_link_with_updating_sources(const CompilerFlags &flags) {
+        Arguments arguments;
         std::list<fs::path> files;
+        std::optional<fs::path> output;
+        size_t sources_count = 0;
 
         for (const auto &flag : flags) {
-            switch (flag.type)
-            {
+            switch (flag.type) {
+                case CompilerFlagType::KIND_OF_OUTPUT_OUTPUT: {
+                    auto candidate = fs::path(flag.arguments.back());
+                    output = std::make_optional(std::move(candidate));
+                    continue;
+                }
                 case CompilerFlagType::SOURCE: {
+                    sources_count++;
                     const auto source_after_compilation = flag.arguments.front() + ".o";
-                    arguments_with_updated_sources.push_back(source_after_compilation);
+                    arguments.push_back(source_after_compilation);
                     files.emplace_back(source_after_compilation);
                     break;
                 }
                 case CompilerFlagType::LINKER_OBJECT_FILE: {
-                    arguments_with_updated_sources.push_back(flag.arguments.front());
+                    arguments.push_back(flag.arguments.front());
                     files.emplace_back(flag.arguments.front());
                     break;
                 }
-                case CompilerFlagType::KIND_OF_OUTPUT_OUTPUT:
-                    break;
-                default:
-                    std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments_with_updated_sources));
+                default: {
+                    std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments));
+                }
             }
         }
-        return std::make_tuple(arguments_with_updated_sources, files);
+        return std::make_tuple(arguments, files, output, sources_count);
     }
 }
 
@@ -341,7 +351,8 @@ namespace cs::semantic {
                         return rust::Ok(std::move(result));
                     }
 
-                    auto[arguments, sources, output, object_files_and_libs] = split(flags);
+                    // arguments contains everything except output and sources
+                    auto[arguments, sources, libs, output] = split_compile(flags);
                     if (sources.empty()) {
                         return rust::Err(std::runtime_error("Source files not found for compilation."));
                     }
@@ -360,7 +371,7 @@ namespace cs::semantic {
                         execution.executable,
                         std::move(arguments),
                         std::move(sources),
-                        std::move(object_files_and_libs),
+                        std::move(libs),
                         std::move(output),
                         with_linking
                     );
@@ -394,35 +405,20 @@ namespace cs::semantic {
                         return rust::Ok(std::move(result));
                     }
 
-                    auto[arguments, sources, output, object_files_and_libs] = split(flags);
-
-                    // only linking
-                    if (sources.empty()) {
-                        SemanticPtr result = std::make_shared<Link>(
-                            execution.working_dir,
-                            execution.executable,
-                            std::move(arguments),
-                            std::move(object_files_and_libs),
-                            std::move(output)
-                        );
-                        return rust::Ok(std::move(result));
+                    // arguments contains everything except output
+                    auto[arguments, object_files_and_libs, output, sources_count] = split_link_with_updating_sources(flags);
+                    if (sources_count != 0 && !has_linker(flags)) {
+                        return rust::Err(std::runtime_error("Without linking."));
                     }
 
-                    // compilation and linking
-                    if (has_linker(flags)) {
-                        auto [updated_arguments, files] = split_with_updating_sources(flags);
-
-                        SemanticPtr result = std::make_shared<Link>(
+                    SemanticPtr result = std::make_shared<Link>(
                         execution.working_dir,
-                            execution.executable,
-                            std::move(updated_arguments),
-                            std::move(files),
-                            std::move(output)
-                        );
-                        return rust::Ok(std::move(result));
-                    }
-
-                    return rust::Err(std::runtime_error("Without linking."));
+                        execution.executable,
+                        std::move(arguments),
+                        std::move(object_files_and_libs),
+                        std::move(output)
+                    );
+                    return rust::Ok(std::move(result));
                 });
     }
 }
