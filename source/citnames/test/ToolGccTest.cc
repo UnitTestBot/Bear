@@ -67,8 +67,9 @@ namespace {
                 new Compile(
                         input.working_dir,
                         input.executable,
-                        {"-c"},
+                        {"-c", "source.c"},
                         {fs::path("source.c")},
+                        {},
                         {fs::path("source.o")},
                         false
                 )
@@ -92,8 +93,9 @@ namespace {
                 new Compile(
                         input.working_dir,
                         input.executable,
-                        {"-c"},
+                        {"-c", "-L.", "-lthing", "source.c"},
                         {fs::path("source.c")},
+                        {},
                         {fs::path("exe")},
                         true
                 )
@@ -135,13 +137,14 @@ namespace {
                         input.working_dir,
                         input.executable,
                         {
-                                "-c",
+                                "-c", "source.c",
                                 "-I", "/usr/include/path1",
                                 "-I", "/usr/include/path2",
                                 "-I", ".",
                                 "-I", "/usr/include/path3",
                         },
                         {fs::path("source.c")},
+                        {},
                         std::nullopt,
                         false
                 )

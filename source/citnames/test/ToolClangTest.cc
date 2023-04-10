@@ -53,8 +53,9 @@ namespace {
         const Compile expected(
                 input.working_dir,
                 input.executable,
-                {"-c"},
+                {"-c", "source.c"},
                 {fs::path("source.c")},
+                {},
                 {fs::path("source.o")},
                 false
         );
@@ -76,8 +77,9 @@ namespace {
         const Compile expected(
                 input.working_dir,
                 input.executable,
-                {"-c"},
+                {"-c", "-L.", "-lthing", "source.c"},
                 {fs::path("source.c")},
+                {},
                 {fs::path("exe")},
                 true
         );
@@ -125,8 +127,9 @@ namespace {
         const Compile expected(
                 input.working_dir,
                 input.executable,
-                {"-c", "-Xclang", "-load", "-Xclang", "/path/to/LLVMHello.so"},
+                {"-c", "source.c", "-Xclang", "-load", "-Xclang", "/path/to/LLVMHello.so"},
                 {fs::path("source.c")},
+                {},
                 {fs::path("source.o")},
                 false
         );
@@ -160,8 +163,9 @@ namespace {
         const Compile expected(
                 input.working_dir,
                 input.executable,
-                {"-c", "-Xarch_arg1", "arg2", "-Xarch_device", "device1", "-Xarch_host", "host1"},
+                {"-c", "source.c", "-Xarch_arg1", "arg2", "-Xarch_device", "device1", "-Xarch_host", "host1"},
                 {fs::path("source.c")},
+                {},
                 {fs::path("source.o")},
                 false
         );
@@ -193,8 +197,9 @@ namespace {
         const Compile expected(
                 input.working_dir,
                 input.executable,
-                {"-c", "-Xcuda-fatbinary", "arg1", "-Xcuda-ptxas", "arg2"},
+                {"-c", "source.c", "-Xcuda-fatbinary", "arg1", "-Xcuda-ptxas", "arg2"},
                 {fs::path("source.c")},
+                {},
                 {fs::path("source.o")},
                 false
         );
@@ -226,8 +231,9 @@ namespace {
         const Compile expected(
                 input.working_dir,
                 input.executable,
-                {"-c", "-Xopenmp-target", "arg1", "-Xopenmp-target=arg1", "arg2"},
+                {"-c", "source.c", "-Xopenmp-target", "arg1", "-Xopenmp-target=arg1", "arg2"},
                 {fs::path("source.c")},
+                {},
                 {fs::path("source.o")},
                 false
         );
@@ -259,8 +265,9 @@ namespace {
         const Compile expected(
                 input.working_dir,
                 input.executable,
-                {"-c", "-Z", "arg1", "-aargs", "--analyze"},
+                {"-c", "source.c", "-Z", "arg1", "-aargs", "--analyze"},
                 {fs::path("source.c")},
+                {},
                 {fs::path("source.o")},
                 false
         );
