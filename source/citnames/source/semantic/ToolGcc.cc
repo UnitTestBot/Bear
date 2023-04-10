@@ -28,6 +28,8 @@
 #include <set>
 #include <string_view>
 
+#include <iostream>
+
 using namespace cs::semantic;
 
 namespace {
@@ -141,19 +143,29 @@ namespace {
     std::tuple<Arguments, std::list<fs::path>>
     split_with_updating_sources(const CompilerFlags &flags) {
         Arguments arguments_with_updated_sources;
-        std::list<fs::path> sources_after_compilation;
+        std::list<fs::path> files;
 
         for (const auto &flag : flags) {
-            if (CompilerFlagType::SOURCE == flag.type) {
-                const auto source_after_compilation = flag.arguments.front() + ".o";
-                arguments_with_updated_sources.push_back(source_after_compilation);
-                sources_after_compilation.emplace_back(source_after_compilation);
-            }
-            else {
-                std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments_with_updated_sources));
+            switch (flag.type)
+            {
+                case CompilerFlagType::SOURCE: {
+                    const auto source_after_compilation = flag.arguments.front() + ".o";
+                    arguments_with_updated_sources.push_back(source_after_compilation);
+                    files.emplace_back(source_after_compilation);
+                    break;
+                }
+                case CompilerFlagType::LINKER_OBJECT_FILE: {
+                    arguments_with_updated_sources.push_back(flag.arguments.front());
+                    files.emplace_back(flag.arguments.front());
+                    break;
+                }
+                case CompilerFlagType::KIND_OF_OUTPUT_OUTPUT:
+                    break;
+                default:
+                    std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments_with_updated_sources));
             }
         }
-        return std::make_tuple(arguments_with_updated_sources, sources_after_compilation);
+        return std::make_tuple(arguments_with_updated_sources, files);
     }
 }
 
@@ -298,7 +310,7 @@ namespace cs::semantic {
     }
 
     bool ToolGcc::is_linker_call(const fs::path& program) const {
-        static const auto pattern = std::regex(R"((ld|lld|gold|ar)*)");
+        static const auto pattern = std::regex(R"(^(ld|lld|gold|ar)\S*$)");
         std::cmatch m;
         return is_compiler_call(program) || std::regex_match(program.filename().c_str(), m, pattern);
     }
@@ -399,7 +411,6 @@ namespace cs::semantic {
                     // compilation and linking
                     if (has_linker(flags)) {
                         auto [updated_arguments, files] = split_with_updating_sources(flags);
-                        std::copy(object_files_and_libs.begin(), object_files_and_libs.end(), std::back_inserter(files));
 
                         SemanticPtr result = std::make_shared<Link>(
                         execution.working_dir,
@@ -411,7 +422,7 @@ namespace cs::semantic {
                         return rust::Ok(std::move(result));
                     }
 
-                    return rust::Ok(SemanticPtr());
+                    return rust::Err(std::runtime_error("Without linking."));
                 });
     }
 }
