@@ -126,7 +126,8 @@ namespace {
                     sources.emplace_back(std::move(candidate));
                     continue;
                 }
-                case CompilerFlagType::LINKER_OBJECT_FILE: {
+                case CompilerFlagType::LIBRARY:
+                case CompilerFlagType::OBJECT_FILE: {
                     auto candidate = fs::path(flag.arguments.front());
                     libs.emplace_back(candidate);
                     break;
@@ -165,7 +166,8 @@ namespace {
                     files.emplace_back(source_after_compilation);
                     break;
                 }
-                case CompilerFlagType::LINKER_OBJECT_FILE: {
+                case CompilerFlagType::LIBRARY:
+                case CompilerFlagType::OBJECT_FILE: {
                     arguments.push_back(flag.arguments.front());
                     files.emplace_back(flag.arguments.front());
                     break;
@@ -329,18 +331,21 @@ namespace cs::semantic {
         return compilation(FLAG_DEFINITION, execution);
     }
 
-    rust::Result<SemanticPtr> ToolGcc::compilation(const FlagsByName &flags, const Execution &execution) {
-        const auto &parser =
-                Repeat(
-                        OneOf(
-                                FlagParser(flags),
-                                SourceMatcher(),
-                                EverythingElseFlagMatcher()
-                        )
-                );
+    auto get_parser(const FlagsByName &flags) {
+        return Repeat(
+                    OneOf(
+                        FlagParser(flags),
+                        SourceMatcher(),
+                        ObjectFileMatcher(),
+                        LibraryMatcher(),
+                        EverythingElseFlagMatcher()
+                    )
+        );
+    }
 
+    rust::Result<SemanticPtr> ToolGcc::compilation(const FlagsByName &flags, const Execution &execution) {
         const Arguments &input_arguments = create_argument_list(execution);
-        return parse(parser, input_arguments)
+        return parse(get_parser(flags), input_arguments)
                 .and_then<SemanticPtr>([&execution](auto flags) -> rust::Result<SemanticPtr> {
                     if (is_compiler_query(flags)) {
                         SemanticPtr result = std::make_shared<QueryCompiler>();
@@ -384,17 +389,8 @@ namespace cs::semantic {
     }
 
     rust::Result<SemanticPtr> ToolGcc::linking(const FlagsByName &flags, const Execution &execution) {
-        const auto &parser =
-                Repeat(
-                        OneOf(
-                                FlagParser(flags),
-                                SourceMatcher(),
-                                EverythingElseFlagMatcher()
-                        )
-                );
-
         const Arguments &input_arguments = create_argument_list(execution);
-        return parse(parser, input_arguments)
+        return parse(get_parser(flags), input_arguments)
                 .and_then<SemanticPtr>([&execution](auto flags) -> rust::Result<SemanticPtr> {
                     if (is_compiler_query(flags)) {
                         SemanticPtr result = std::make_shared<QueryCompiler>();

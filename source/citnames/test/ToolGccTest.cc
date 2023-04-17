@@ -48,7 +48,7 @@ namespace {
         EXPECT_TRUE(sut.is_compiler_call("fortran"));
     }
 
-    TEST(ToolGcc, fails_on_empty) {
+    TEST(ToolGcc, compilation_fails_on_empty) {
         Execution input = {};
 
         ToolGcc sut;
@@ -56,10 +56,10 @@ namespace {
         EXPECT_TRUE(Tool::not_recognized(sut.recognize(input, BuildTarget::COMPILER)));
     }
 
-    TEST(ToolGcc, check_compilation_without_compilation) {
+    TEST(ToolGcc, compilation_check_compilation_without_compilation) {
         Execution input = {
                 "/usr/bin/cc",
-                {"cc", "-L.", "source_1.o", "lib", "source_2.o", "-la"},
+                {"cc", "-L.", "source_1.o", "lib.a", "source_2.o", "-la"},
                 "/home/user/project",
                 {},
         };
@@ -68,7 +68,7 @@ namespace {
         EXPECT_TRUE(Tool::recognized_with_error(sut.recognize(input, BuildTarget::COMPILER)));
     }
 
-    TEST(ToolGcc, simple) {
+    TEST(ToolGcc, compilation_simple) {
         Execution input = {
                 "/usr/bin/cc",
                 {"cc", "-c", "-o", "source.o", "source.c"},
@@ -94,7 +94,7 @@ namespace {
         EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }
 
-    TEST(ToolGcc, output_filtered) {
+    TEST(ToolGcc, compilation_output_filtered) {
         Execution input = {
                 "/usr/bin/cc",
                 {"cc", "source.c", "-L.", "-lthing", "-o", "exe"},
@@ -120,7 +120,7 @@ namespace {
         EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }
 
-    TEST(ToolGcc, pass_on_help) {
+    TEST(ToolGcc, compilation_pass_on_help) {
         Execution input = {
                 "/usr/bin/gcc",
                 {"gcc", "--version"},
@@ -136,7 +136,7 @@ namespace {
         EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }
 
-    TEST(ToolGcc, simple_with_C_PATH) {
+    TEST(ToolGcc, compilation_simple_with_C_PATH) {
         Execution input = {
                 "/usr/bin/cc",
                 {"cc", "-c", "source.c"},
@@ -195,10 +195,10 @@ namespace {
         EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }
 
-    TEST(ToolGcc, compilation_with_linking) {
+    TEST(ToolGcc, compilation_with_linking_with_obj) {
         Execution input = {
                 "/usr/bin/cc",
-                {"cc", "source_1.c", "-o", "source", "source_2.c", "lib.o"},
+                {"cc", "source_1.c", "-o", "source", "source_2.c", "obj.o"},
                 "/home/user/project",
                 {},
         };
@@ -206,11 +206,63 @@ namespace {
                 new Compile(
                         input.working_dir,
                         input.executable,
-                        {"-c", "lib.o"},
+                        {"-c", "obj.o"},
                         {"source_1.c", "source_2.c"},
-                        {"lib.o"},
+                        {"obj.o"},
                         {fs::path("source")},
                         true
+                )
+        );
+
+        ToolGcc sut({});
+
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
+        EXPECT_TRUE(Tool::recognized_ok(result));
+        EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
+    }
+
+    TEST(ToolGcc, compilation_with_obj_and_libs) {
+        Execution input = {
+                "/usr/bin/cc",
+                {"cc", "-c", "lib.library", "source_1.c", "lib.so.2", "-o", "source", "source_2.c", "obj.o", "lib.dll"},
+                "/home/user/project",
+                {},
+        };
+        SemanticPtr expected = SemanticPtr(
+                new Compile(
+                        input.working_dir,
+                        input.executable,
+                        {"-c", "lib.library", "lib.so.2", "obj.o", "lib.dll"},
+                        {"source_1.c", "source_2.c"},
+                        {"lib.library", "lib.so.2", "obj.o", "lib.dll"},
+                        {fs::path("source")},
+                        false
+                )
+        );
+
+        ToolGcc sut({});
+
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
+        EXPECT_TRUE(Tool::recognized_ok(result));
+        EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
+    }
+
+    TEST(ToolGcc, compilation_with_unknown_files) {
+        Execution input = {
+                "/usr/bin/cc",
+                {"cc", "-c", "lib.library", "lib", "aaaaa", "source_1.c", "lib.so", "-o", "source", "source_2.c", "obj.o", "lib.dll"},
+                "/home/user/project",
+                {},
+        };
+        SemanticPtr expected = SemanticPtr(
+                new Compile(
+                        input.working_dir,
+                        input.executable,
+                        {"-c", "lib.library", "lib", "aaaaa", "lib.so", "obj.o", "lib.dll"},
+                        {"source_1.c", "source_2.c"},
+                        {"lib.library", "lib.so", "obj.o", "lib.dll"},
+                        {fs::path("source")},
+                        false
                 )
         );
 
@@ -248,7 +300,7 @@ namespace {
         EXPECT_TRUE(sut.is_linker_call("ar"));
     }
 
-    TEST(ToolGcc, fails_on_empty_link) {
+    TEST(ToolGcc, linking_fails_on_empty) {
         Execution input = {};
 
         ToolGcc sut;
@@ -331,7 +383,7 @@ namespace {
     TEST(ToolGcc, linking) {
         Execution input = {
                 "/usr/bin/cc",
-                {"cc", "-L.", "source_1.o", "lib", "source_2.o", "-la"},
+                {"cc", "-L.", "source_1.o", "uncorrect_lib", "lib.DLL", "source_2.o", "-la"},
                 "/home/user/project",
                 {},
         };
@@ -339,8 +391,8 @@ namespace {
                 new Link(
                         input.working_dir,
                         input.executable,
-                        {"-L.", "source_1.o", "lib", "source_2.o", "-la"},
-                        {"source_1.o", "lib", "source_2.o"},
+                        {"-L.", "source_1.o", "uncorrect_lib", "lib.DLL", "source_2.o", "-la"},
+                        {"source_1.o", "lib.DLL", "source_2.o"},
                         std::nullopt
                 )
         );
