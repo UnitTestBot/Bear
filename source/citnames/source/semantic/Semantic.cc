@@ -90,14 +90,14 @@ namespace cs::semantic {
                      fs::path compiler,
                      std::list<std::string> flags,
                      std::list<fs::path> sources,
-                     std::list<fs::path> libs,
+                     std::list<fs::path> dependencies,
                      std::optional<fs::path> output,
                      bool with_linking)
             : working_dir(std::move(working_dir))
             , compiler(std::move(compiler))
             , flags(std::move(flags))
             , sources(std::move(sources))
-            , libs(std::move(libs))
+            , dependencies(std::move(dependencies))
             , output(std::move(output))
             , with_linking(with_linking)
     { }
@@ -111,7 +111,7 @@ namespace cs::semantic {
                 && (compiler == ptr->compiler)
                 && (flags == ptr->flags)
                 && (sources == ptr->sources)
-                && (libs == ptr->libs)
+                && (dependencies == ptr->dependencies)
                 && (output == ptr->output)
                 && (with_linking == ptr->with_linking);
         }
@@ -123,7 +123,7 @@ namespace cs::semantic {
             << ", compiler: " << compiler
             << ", flags: " << fmt::format("[{}]", fmt::join(flags.begin(), flags.end(), ", "))
             << ", sources: " << fmt::format("[{}]", fmt::join(sources.begin(), sources.end(), ", "))
-            << ", libs: " << fmt::format("[{}]", fmt::join(libs.begin(), libs.end(), ", "))
+            << ", dependencies: " << fmt::format("[{}]", fmt::join(dependencies.begin(), dependencies.end(), ", "))
             << ", output: " << (output ? output.value().string() : "")
             << ", with_linking: " << with_linking
             << " }";
@@ -139,7 +139,7 @@ namespace cs::semantic {
 
             cs::Entry result {
                 abspath(source, working_dir),
-                libs,
+                dependencies,
                 working_dir,
                 abspath(real_output, working_dir),
                 { compiler.string() }

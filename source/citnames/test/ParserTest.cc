@@ -117,7 +117,7 @@ namespace {
             "lib.DLL",
             "lib.lib",
             "lib.ocx",
-            "lib.so.2"
+            "lib.so.2.13.9746.adhfj.9"
         };
         const auto flags = parse(sut, input);
         EXPECT_TRUE(flags.is_ok());

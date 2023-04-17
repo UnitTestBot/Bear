@@ -28,8 +28,6 @@
 #include <set>
 #include <string_view>
 
-#include <iostream>
-
 using namespace cs::semantic;
 
 namespace {
@@ -111,7 +109,7 @@ namespace {
     > split_compile(const CompilerFlags &flags) {
         Arguments arguments;
         std::list<fs::path> sources;
-        std::list<fs::path> libs;
+        std::list<fs::path> dependencies;
         std::optional<fs::path> output;
 
         for (const auto &flag : flags) {
@@ -129,7 +127,7 @@ namespace {
                 case CompilerFlagType::LIBRARY:
                 case CompilerFlagType::OBJECT_FILE: {
                     auto candidate = fs::path(flag.arguments.front());
-                    libs.emplace_back(candidate);
+                    dependencies.emplace_back(candidate);
                     break;
                 }
                 default: {
@@ -138,7 +136,7 @@ namespace {
             }
             std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments));
         }
-        return std::make_tuple(arguments, sources, libs, output);
+        return std::make_tuple(arguments, sources, dependencies, output);
     }
 
     std::tuple<
@@ -357,7 +355,7 @@ namespace cs::semantic {
                     }
 
                     // arguments contains everything except output and sources
-                    auto[arguments, sources, libs, output] = split_compile(flags);
+                    auto[arguments, sources, dependencies, output] = split_compile(flags);
                     if (sources.empty()) {
                         return rust::Err(std::runtime_error("Source files not found for compilation."));
                     }
@@ -376,7 +374,7 @@ namespace cs::semantic {
                         execution.executable,
                         std::move(arguments),
                         std::move(sources),
-                        std::move(libs),
+                        std::move(dependencies),
                         std::move(output),
                         with_linking
                     );
@@ -402,7 +400,7 @@ namespace cs::semantic {
                     }
 
                     // arguments contains everything except output
-                    auto[arguments, object_files_and_libs, output, sources_count] = split_link_with_updating_sources(flags);
+                    auto[arguments, files, output, sources_count] = split_link_with_updating_sources(flags);
                     if (sources_count != 0 && !has_linker(flags)) {
                         return rust::Err(std::runtime_error("Without linking."));
                     }
@@ -411,7 +409,7 @@ namespace cs::semantic {
                         execution.working_dir,
                         execution.executable,
                         std::move(arguments),
-                        std::move(object_files_and_libs),
+                        std::move(files),
                         std::move(output)
                     );
                     return rust::Ok(std::move(result));

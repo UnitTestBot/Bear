@@ -87,7 +87,7 @@ namespace cs::semantic {
                 fs::path compiler,
                 std::list<std::string> flags,
                 std::list<fs::path> sources,
-                std::list<fs::path> libs,
+                std::list<fs::path> dependencies,
                 std::optional<fs::path> output,
                 bool with_linking);
 
@@ -101,7 +101,7 @@ namespace cs::semantic {
         fs::path compiler;
         std::list<std::string> flags;
         std::list<fs::path> sources;
-        std::list<fs::path> libs;
+        std::list<fs::path> dependencies;
         std::optional<fs::path> output;
         bool with_linking;
     };

@@ -335,11 +335,7 @@ namespace cs::semantic {
         }
         const auto &candidate = input.front();
         const auto &extension = take_extension(candidate);
-        const bool has_so_2_extension =
-            (".2" == extension) &&
-            ".so" == take_extension(candidate.substr(0, candidate.size() - 2));
-
-        if (extensions.find(extension) != extensions.end() || has_so_2_extension) {
+        if (extensions.find(extension) != extensions.end() || candidate.find(".so.") != std::string::npos) {
             const auto &[arguments, remainder] = input.take(1);
             if (arguments.empty()) {
                 return rust::Err(input);
