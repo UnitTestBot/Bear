@@ -1,10 +1,6 @@
 #!/usr/bin/env sh
 
 # REQUIRES: shell
-# RUN: rm -f lib.o
-# RUN:
-# RUN: gcc -c lib.c -o lib.o
-
 # RUN: cd %T; %{bear} --verbose --with-link --output-compile %t.json --output-link %t_link.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 2
 # RUN: assert_compilation %t.json contains -file %T/compile_link_some_files_1.c -directory %T -arguments %{c_compiler} -c -o compile_link_some_files_1.c.o compile_link_some_files_1.c
