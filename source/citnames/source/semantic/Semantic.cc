@@ -131,6 +131,7 @@ namespace cs::semantic {
     }
 
     std::list<cs::Entry> Compile::into_entries() const {
+        const auto dependencies_abspath = abspath(dependencies, working_dir);
         std::list<cs::Entry> results;
         for (const auto& source : sources) {
             const fs::path real_output = (output && !with_linking)
@@ -139,7 +140,7 @@ namespace cs::semantic {
 
             cs::Entry result {
                 abspath(source, working_dir),
-                dependencies,
+                dependencies_abspath,
                 working_dir,
                 abspath(real_output, working_dir),
                 { compiler.string() }
