@@ -202,7 +202,7 @@ namespace {
         const bool with_link
     ) {
         std::set<size_t> all_ppid;
-        std::set<size_t> wrong_command_parent_pids;
+        std::set<size_t> writed_command_pids;
 
         for (const rpc::Event &event : *events) {
             const size_t pid = event.started().pid();
@@ -216,8 +216,8 @@ namespace {
             }
             all_ppid.insert(ppid);
 
-            if (wrong_command_parent_pids.find(ppid) != wrong_command_parent_pids.end()) {
-                wrong_command_parent_pids.insert(pid);
+            if (writed_command_pids.find(ppid) != writed_command_pids.end()) {
+                writed_command_pids.insert(pid);
                 continue;
             }
 
@@ -229,7 +229,7 @@ namespace {
             const auto entries_compile = build.recognize(event, cs::semantic::BuildTarget::COMPILER)
                 .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
             if (!entries_compile.empty()) {
-                wrong_command_parent_pids.insert(pid);
+                writed_command_pids.insert(pid);
                 std::copy(entries_compile.begin(), entries_compile.end(), std::back_inserter(output_compile));
             }
 
@@ -237,7 +237,7 @@ namespace {
                 const auto entries_link = build.recognize(event, cs::semantic::BuildTarget::LINKER)
                     .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
                 if (!entries_link.empty()) {
-                    wrong_command_parent_pids.insert(pid);
+                    writed_command_pids.insert(pid);
                     std::copy(entries_link.begin(), entries_link.end(), std::back_inserter(output_link));
                 }
             }
