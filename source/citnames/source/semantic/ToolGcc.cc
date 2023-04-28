@@ -408,7 +408,14 @@ namespace cs::semantic {
                         return rust::Err(std::runtime_error("Without linking."));
                     }
                     if (files.empty()) {
-                        spdlog::debug("Files not found for linking in command: {}", std::accumulate(arguments.begin(), arguments.end(), std::string{}));
+                        spdlog::debug("Files not found for linking in command: {}", std::accumulate(
+                            std::next(arguments.begin()),
+                            arguments.end(),
+                            arguments.front(),
+                            [](std::string res, std::string flag) {
+                                return std::move(res) + " " + std::move(flag);
+                            }
+                        ));
                         return rust::Err(std::runtime_error("Files not found for linking."));
                     }
 
