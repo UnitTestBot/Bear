@@ -27,6 +27,7 @@
 #include <functional>
 #include <set>
 #include <string_view>
+#include <numeric>
 
 #include <spdlog/spdlog.h>
 
@@ -407,9 +408,7 @@ namespace cs::semantic {
                         return rust::Err(std::runtime_error("Without linking."));
                     }
                     if (files.empty()) {
-                        for (const auto &arg : arguments) {
-                            spdlog::debug("{} ", arg);
-                        }
+                        spdlog::debug("Files not found for linking in command: {}", std::accumulate(arguments.begin(), arguments.end(), std::string{}));
                         return rust::Err(std::runtime_error("Files not found for linking."));
                     }
 
