@@ -28,6 +28,8 @@
 #include <set>
 #include <string_view>
 
+#include <spdlog/spdlog.h>
+
 using namespace cs::semantic;
 
 namespace {
@@ -403,6 +405,12 @@ namespace cs::semantic {
                     auto[arguments, files, output, sources_count] = split_link_with_updating_sources(flags);
                     if (sources_count != 0 && !has_linker(flags)) {
                         return rust::Err(std::runtime_error("Without linking."));
+                    }
+                    if (files.empty()) {
+                        for (const auto &arg : arguments) {
+                            spdlog::debug("{} ", arg);
+                        }
+                        return rust::Err(std::runtime_error("Files not found for linking."));
                     }
 
                     SemanticPtr result = std::make_shared<Link>(
