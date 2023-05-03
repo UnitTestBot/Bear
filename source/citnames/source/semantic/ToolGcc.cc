@@ -180,6 +180,18 @@ namespace {
         }
         return std::make_tuple(arguments, files, output, sources_count);
     }
+
+    auto get_parser(const FlagsByName &flags) {
+        return Repeat(
+                    OneOf(
+                        FlagParser(flags),
+                        SourceMatcher(),
+                        ObjectFileMatcher(),
+                        LibraryMatcher(),
+                        EverythingElseFlagMatcher()
+                    )
+        );
+    }
 }
 
 namespace cs::semantic {
@@ -323,25 +335,13 @@ namespace cs::semantic {
     }
 
     bool ToolGcc::is_linker_call(const fs::path& program) const {
-        static const auto pattern = std::regex(R"(^(ld|lld|gold|ar)\S*$)");
+        static const auto pattern = std::regex(R"(^(ld|lld)\S*$)");
         std::cmatch m;
         return is_compiler_call(program) || std::regex_match(program.filename().c_str(), m, pattern);
     }
 
     rust::Result<SemanticPtr> ToolGcc::compilation(const Execution &execution) const {
         return compilation(FLAG_DEFINITION, execution);
-    }
-
-    auto get_parser(const FlagsByName &flags) {
-        return Repeat(
-                    OneOf(
-                        FlagParser(flags),
-                        SourceMatcher(),
-                        ObjectFileMatcher(),
-                        LibraryMatcher(),
-                        EverythingElseFlagMatcher()
-                    )
-        );
     }
 
     rust::Result<SemanticPtr> ToolGcc::compilation(const FlagsByName &flags, const Execution &execution) {
