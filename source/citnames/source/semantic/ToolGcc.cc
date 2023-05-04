@@ -233,8 +233,7 @@ namespace {
 
     inline bool contains_static_flag(const CompilerFlags &flags) {
         return std::any_of(flags.begin(), flags.end(), [](const auto& flag) {
-            // later highlight this as a separate flag, and do the rest with a prefix -static-
-            return flag.type == CompilerFlagType::LINKER_LIBRARY_STATIC && flag.arguments.front() == "-static";
+            return flag.type == CompilerFlagType::LINKER_LIBRARY_STATIC;
         });
     }
 
@@ -403,7 +402,8 @@ namespace cs::semantic {
             {"-rdynamic",          {MatchInstruction::EXACTLY,                          CompilerFlagType::LINKER}},
             {"-s",                 {MatchInstruction::EXACTLY,                          CompilerFlagType::LINKER}},
             {"-symbolic",          {MatchInstruction::EXACTLY,                          CompilerFlagType::LINKER}},
-            {"-static",            {MatchInstruction::PREFIX,                           CompilerFlagType::LINKER_LIBRARY_STATIC}},
+            {"-static",            {MatchInstruction::EXACTLY,                          CompilerFlagType::LINKER_LIBRARY_STATIC}},
+            {"-static-",           {MatchInstruction::PREFIX,                           CompilerFlagType::LINKER}},
             {"-shared",            {MatchInstruction::PREFIX,                           CompilerFlagType::LINKER}},
             {"-T",                 {MatchInstruction::EXACTLY_WITH_1_OPT_SEP,           CompilerFlagType::LINKER}},
             {"-Xlinker",           {MatchInstruction::EXACTLY_WITH_1_OPT_SEP,           CompilerFlagType::LINKER}},
