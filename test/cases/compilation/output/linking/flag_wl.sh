@@ -6,7 +6,7 @@
 # RUN: ar qc %T/libflag_wl_2.a
 # RUN: touch %T/libflag_wl_2.%{dynamic_lib_extension}
 
-# RUN: mkdir %T/other
+# RUN: mkdir -p %T/other
 # RUN: ar qc %T/other/libflag_wl_3.a
 # RUN: ar qc %T/other/libflag_wl_1.a
 # RUN: touch %T/other/libflag_wl_3.%{dynamic_lib_extension}
