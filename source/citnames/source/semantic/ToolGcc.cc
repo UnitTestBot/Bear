@@ -121,44 +121,6 @@ namespace {
         });
     }
 
-    std::tuple<
-            Arguments,
-            std::list<fs::path>,
-            std::list<fs::path>,
-            std::optional<fs::path>
-    > split_compile(const CompilerFlags &flags) {
-        Arguments arguments;
-        std::list<fs::path> sources;
-        std::list<fs::path> dependencies;
-        std::optional<fs::path> output;
-
-        for (const auto &flag : flags) {
-            switch (flag.type) {
-                case CompilerFlagType::KIND_OF_OUTPUT_OUTPUT: {
-                    auto candidate = fs::path(flag.arguments.back());
-                    output = std::make_optional(std::move(candidate));
-                    continue;
-                }
-                case CompilerFlagType::SOURCE: {
-                    auto candidate = fs::path(flag.arguments.front());
-                    sources.emplace_back(std::move(candidate));
-                    continue;
-                }
-                case CompilerFlagType::LIBRARY:
-                case CompilerFlagType::OBJECT_FILE: {
-                    auto candidate = fs::path(flag.arguments.front());
-                    dependencies.emplace_back(candidate);
-                    break;
-                }
-                default: {
-                    break;
-                }
-            }
-            std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments));
-        }
-        return std::make_tuple(arguments, sources, dependencies, output);
-    }
-
     std::string directory_path_from_flag(const CompilerFlag& flag) {
         assert(flag.type == CompilerFlagType::DIRECTORY_SEARCH_LIBRARY);
 
@@ -234,6 +196,84 @@ namespace {
         });
     }
 
+    void processing_linker_options_flag(const CompilerFlag& flag, LibraryPriorityType& type) {
+        const auto& options = flag.arguments.front();
+        size_t option_start = 0;
+
+        while (option_start < options.size()) {
+            size_t option_end = options.find(',', option_start);
+            if (option_end == std::string::npos) {
+                option_end = options.size();
+            }
+            const auto option = options.substr(option_start, option_end - option_start);
+            if (type != LibraryPriorityType::ONLY_STATIC_FIXED && option == "-Bdynamic") {
+                type = LibraryPriorityType::FIRSTLY_SHARED;
+            }
+            if (type != LibraryPriorityType::ONLY_STATIC_FIXED && option == "-Bstatic") {
+                type = LibraryPriorityType::ONLY_STATIC;
+            }
+            option_start = option_end + 1;
+        }
+    }
+
+    std::tuple<
+            Arguments,
+            std::list<fs::path>,
+            std::list<fs::path>,
+            std::optional<fs::path>
+    > split_compile(const CompilerFlags &flags, const std::vector<std::string>& library_directories) {
+        Arguments arguments;
+        std::list<fs::path> sources;
+        std::list<fs::path> dependencies;
+        std::optional<fs::path> output;
+
+        std::vector<std::string> added_library_directories;
+        LibraryPriorityType type = (contains_static_flag(flags))
+            ? LibraryPriorityType::ONLY_STATIC_FIXED
+            : LibraryPriorityType::FIRSTLY_SHARED;
+
+        for (const auto &flag : flags) {
+            switch (flag.type) {
+                case CompilerFlagType::KIND_OF_OUTPUT_OUTPUT: {
+                    auto candidate = fs::path(flag.arguments.back());
+                    output = std::make_optional(std::move(candidate));
+                    continue;
+                }
+                case CompilerFlagType::SOURCE: {
+                    auto candidate = fs::path(flag.arguments.front());
+                    sources.emplace_back(std::move(candidate));
+                    continue;
+                }
+                case CompilerFlagType::LIBRARY:
+                case CompilerFlagType::OBJECT_FILE: {
+                    auto candidate = fs::path(flag.arguments.front());
+                    dependencies.emplace_back(candidate);
+                    break;
+                }
+                case CompilerFlagType::LINKER_OPTIONS_FLAG: {
+                    processing_linker_options_flag(flag, type);
+                    break;
+                }
+                case CompilerFlagType::DIRECTORY_SEARCH_LIBRARY: {
+                    added_library_directories.push_back(directory_path_from_flag(flag));
+                    break;
+                }
+                case CompilerFlagType::LINKER_LIBRARY_FLAG: {
+                    const auto library = find_library(library_name_from_flag(flag), library_directories, added_library_directories, type);
+                    if (library.has_value()) {
+                        dependencies.push_back(library.value());
+                    }
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+            std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments));
+        }
+        return std::make_tuple(arguments, sources, dependencies, output);
+    }
+
     std::tuple<
             Arguments,
             std::list<fs::path>,
@@ -270,23 +310,7 @@ namespace {
                     break;
                 }
                 case CompilerFlagType::LINKER_OPTIONS_FLAG: {
-                    const auto& options = flag.arguments.front();
-                    size_t option_start = 0;
-
-                    while (option_start < options.size()) {
-                        size_t option_end = options.find(',', option_start);
-                        if (option_end == std::string::npos) {
-                            option_end = options.size();
-                        }
-                        const auto option = options.substr(option_start, option_end - option_start);
-                        if (type != LibraryPriorityType::ONLY_STATIC_FIXED && option == "-Bdynamic") {
-                            type = LibraryPriorityType::FIRSTLY_SHARED;
-                        }
-                        if (type != LibraryPriorityType::ONLY_STATIC_FIXED && option == "-Bstatic") {
-                            type = LibraryPriorityType::ONLY_STATIC;
-                        }
-                        option_start = option_end + 1;
-                    }
+                    processing_linker_options_flag(flag, type);
                     break;
                 }
                 case CompilerFlagType::DIRECTORY_SEARCH_LIBRARY: {
@@ -487,7 +511,7 @@ namespace cs::semantic {
                     }
 
                     // arguments contains everything except output and sources
-                    auto[arguments, sources, dependencies, output] = split_compile(flags);
+                    auto[arguments, sources, dependencies, output] = split_compile(flags, get_library_directories(execution));
                     if (sources.empty()) {
                         return rust::Err(std::runtime_error("Source files not found for compilation."));
                     }
