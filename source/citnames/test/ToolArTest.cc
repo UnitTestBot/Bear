@@ -26,7 +26,7 @@ using namespace cs::semantic;
 
 namespace {
 
-    TEST(ToolAr, is_compiler_call) {
+    TEST(ToolAr, is_ar_call) {
         struct Expose : public ToolAr {
             using ToolAr::is_linker_call;
         };
