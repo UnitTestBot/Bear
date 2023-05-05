@@ -3,7 +3,7 @@
 # REQUIRES: shell
 
 # RUN: ar qc %T/libsome_dir_for_libs.a
-# RUN: mkdir %T/other
+# RUN: mkdir -p %T/other
 # RUN: ar qc %T/other/libsome_dir_for_libs.a
 
 # RUN: cd %T; %{bear} --verbose --with-link --output-compile %t.json --output-link %t_link.json -- %{shell} %s
