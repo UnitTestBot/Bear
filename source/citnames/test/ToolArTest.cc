@@ -34,6 +34,7 @@ namespace {
 
         EXPECT_TRUE(sut.is_linker_call("ar"));
         EXPECT_TRUE(sut.is_linker_call("/usr/bin/ar"));
+        EXPECT_FALSE(sut.is_linker_call("gcc"));
         EXPECT_FALSE(sut.is_linker_call("/usr/bin/gcc"));
     }
 
