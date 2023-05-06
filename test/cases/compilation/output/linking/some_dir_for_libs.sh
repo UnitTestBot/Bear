@@ -3,6 +3,7 @@
 # REQUIRES: shell
 
 # RUN: ar qc %T/libsome_dir_for_libs.a
+
 # RUN: mkdir -p %T/other
 # RUN: ar qc %T/other/libsome_dir_for_libs.a
 
