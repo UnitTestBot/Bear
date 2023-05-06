@@ -4,6 +4,7 @@
 
 # RUN: ar qc %T/libflag_static.a
 # RUN: touch %T/libflag_static.%{dynamic_lib_extension}
+
 # RUN: mkdir -p %T/other
 # RUN: ar qc %T/other/libflag_static.a
 
@@ -15,4 +16,4 @@
 
 echo "int main() { return 0; }" > flag_static.c
 
-$CC -o flag_static -L ./other/ -L. -lflag_static -static flag_static.c
+$CC -o flag_static -static -L ./other/ -L. -lflag_static flag_static.c
