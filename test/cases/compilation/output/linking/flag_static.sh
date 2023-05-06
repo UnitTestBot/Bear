@@ -16,4 +16,4 @@
 
 echo "int main() { return 0; }" > flag_static.c
 
-$CC -o flag_static -static -L ./other/ -L. -lflag_static flag_static.c
+$CC -o flag_static -L ./other/ -L. -lflag_static -static flag_static.c
