@@ -272,4 +272,4 @@ namespace {
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }
-
+}
