@@ -3,12 +3,12 @@
 # REQUIRES: shell
 
 # RUN: touch %T/libflag_wl_1.%{dynamic_lib_extension}
-# RUN: ar qc %T/libflag_wl_2.a
+# RUN: ar -q -c %T/libflag_wl_2.a
 # RUN: touch %T/libflag_wl_2.%{dynamic_lib_extension}
 
 # RUN: mkdir -p %T/other
-# RUN: ar qc %T/other/libflag_wl_3.a
-# RUN: ar qc %T/other/libflag_wl_1.a
+# RUN: ar -q -c %T/other/libflag_wl_3.a
+# RUN: ar -q -c %T/other/libflag_wl_1.a
 # RUN: touch %T/other/libflag_wl_3.%{dynamic_lib_extension}
 # RUN: touch %T/other/libflag_wl_1.%{dynamic_lib_extension}
 

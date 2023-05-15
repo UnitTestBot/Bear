@@ -2,7 +2,7 @@
 
 # REQUIRES: shell
 
-# RUN: ar qc %T/libwith_static_lib.a
+# RUN: ar -q -c %T/libwith_static_lib.a
 
 # RUN: cd %T; %{bear} --verbose --with-link --output-compile %t.json --output-link %t_link.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 1
