@@ -14,12 +14,12 @@ jobs:
             multilib: true
           - os: ubuntu-20.04
             multilib: false
-          - os: macos-10.15
+          - os: macos-12
             multilib: false
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install package dependencies
         if:  startsWith( matrix.os, 'ubuntu' )
