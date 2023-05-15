@@ -14,7 +14,7 @@ jobs:
             multilib: true
           - os: ubuntu-20.04
             multilib: false
-          - os: macos-10.15
+          - os: macos-12
             multilib: false
 
     steps:
