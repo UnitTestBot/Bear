@@ -14,12 +14,12 @@ jobs:
             multilib: true
           - os: ubuntu-20.04
             multilib: false
-          - os: macos-10.15
+          - os: macos-12
             multilib: false
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Install package dependencies
         if:  startsWith( matrix.os, 'ubuntu' )
@@ -33,7 +33,7 @@ jobs:
           brew install cmake pkg-config fmt spdlog nlohmann-json grpc
           echo "PKG_CONFIG_PATH=$(brew --prefix)/opt/openssl@1.1/lib/pkgconfig" >> $GITHUB_ENV
 
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v2
         with:
           python-version: '3.x'
           cache: 'pip'
