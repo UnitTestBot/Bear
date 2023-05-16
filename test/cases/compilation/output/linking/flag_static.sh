@@ -2,11 +2,15 @@
 
 # REQUIRES: shell
 
-# RUN: touch %T/libflag_static.a
+# RUN: echo "int foo() { return 1; }" > %T/libflag_static.c
+# RUN: gcc -o %T/libflag_static.o %T/libflag_static.c
+# RUN: ar -q -c %T/libflag_static.a %T/libflag_static.o
 # RUN: touch %T/libflag_static.%{dynamic_lib_extension}
 
 # RUN: mkdir -p %T/other
-# RUN: touch %T/other/libflag_static.a
+# RUN: echo "int foo1() { return 1; }" > %T/other/libflag_static.c
+# RUN: gcc -o %T/other/libflag_static.o %T/other/libflag_static.c
+# RUN: ar -q -c %T/other/libflag_static.a %T/other/libflag_static.o
 
 # RUN: cd %T; %{bear} --verbose --with-link --output-compile %t.json --output-link %t_link.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 1
