@@ -2,11 +2,11 @@
 
 # REQUIRES: shell
 
-# RUN: ar -q -c %T/libsome_libs.a
+# RUN: touch %T/libsome_libs.a
 # RUN: touch %T/libsome_libs.%{dynamic_lib_extension}
 
 # RUN: mkdir -p %T/other
-# RUN: ar -q -c %T/other/libsome_libs.a
+# RUN: touch %T/other/libsome_libs.a
 
 # RUN: cd %T; %{bear} --verbose --with-link --output-compile %t.json --output-link %t_link.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 1

@@ -2,11 +2,11 @@
 
 # REQUIRES: shell
 
-# RUN: ar -q -c %T/libflag_static.a
+# RUN: touch %T/libflag_static.a
 # RUN: touch %T/libflag_static.%{dynamic_lib_extension}
 
 # RUN: mkdir -p %T/other
-# RUN: ar -q -c %T/other/libflag_static.a
+# RUN: touch %T/other/libflag_static.a
 
 # RUN: cd %T; %{bear} --verbose --with-link --output-compile %t.json --output-link %t_link.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 1
