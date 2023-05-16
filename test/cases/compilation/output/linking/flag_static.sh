@@ -22,6 +22,6 @@
 # RUN: assert_compilation %t_link.json count -eq 1
 # RUN: assert_compilation %t_link.json contains -files %T/flag_static.c.o %T/other/libflag_static.a -directory %T -arguments %{c_compiler} -L ./other/ -L. -static flag_static.c.o -lflag_static -o flag_static
 
-echo "#include "libflag_static.h" int main() { return foo(); }" > flag_static.c
+echo "#include "other/libflag_static.h" int main() { return foo1(); }" > flag_static.c
 
 $CC -o flag_static -L ./other/ -L. -static flag_static.c -lflag_static
