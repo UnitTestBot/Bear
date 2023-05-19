@@ -207,7 +207,6 @@ namespace {
         for (const rpc::Event &event : *events) {
             const size_t pid = event.started().pid();
             const size_t ppid = event.started().ppid();
-
             if (pid == 0 && ppid == 0) {
                 continue;
             }
