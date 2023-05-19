@@ -1,14 +1,15 @@
 #!/usr/bin/env sh
 
+# UNSUPPORTED: -darwin-
 # REQUIRES: shell
 
 # RUN: touch %T/libflag_wl_1.%{dynamic_lib_extension}
-# RUN: touch %T/libflag_wl_2.a
+# RUN: ar -q -c %T/libflag_wl_2.a
 # RUN: touch %T/libflag_wl_2.%{dynamic_lib_extension}
 
 # RUN: mkdir -p %T/other
-# RUN: touch %T/other/libflag_wl_3.a
-# RUN: touch %T/other/libflag_wl_1.a
+# RUN: ar -q -c %T/other/libflag_wl_3.a
+# RUN: ar -q -c %T/other/libflag_wl_1.a
 # RUN: touch %T/other/libflag_wl_3.%{dynamic_lib_extension}
 # RUN: touch %T/other/libflag_wl_1.%{dynamic_lib_extension}
 
