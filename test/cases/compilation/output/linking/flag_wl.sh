@@ -1,7 +1,6 @@
 #!/usr/bin/env sh
 
-# UNSUPPORTED: darwin
-# REQUIRES: shell
+# UNSUPPORTED: is_darwin
 
 # RUN: touch %T/libflag_wl_1.%{dynamic_lib_extension}
 # RUN: ar -q -c %T/libflag_wl_2.a
