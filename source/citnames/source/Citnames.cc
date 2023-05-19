@@ -204,19 +204,16 @@ namespace {
         std::set<size_t> all_ppid;
         std::set<size_t> writed_command_pids;
 
-        std::string pid_info;
-
         for (const rpc::Event &event : *events) {
             const size_t pid = event.started().pid();
             const size_t ppid = event.started().ppid();
-            pid_info.append(fmt::format("ppid: {}, pid: {}\n", ppid, pid));
 
             if (pid == 0 && ppid == 0) {
                 continue;
             }
 
             if (all_ppid.find(pid) != all_ppid.end()) {
-                return rust::Err(std::runtime_error("Processes in events database are not sorted!\n" + pid_info));
+                return rust::Err(std::runtime_error("Processes in events database are not sorted!"));
             }
             all_ppid.insert(ppid);
 
