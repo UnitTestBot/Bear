@@ -28,6 +28,8 @@
 
 #include <filesystem>
 #include <set>
+#include <map>
+#include <stack>
 
 #ifdef HAVE_FMT_STD_H
 #include <fmt/std.h>
@@ -194,15 +196,49 @@ namespace {
                 });
     }
 
-    rust::Result<size_t> transform(
-        cs::semantic::Build &build,
+    bool transform_event(
+        const cs::semantic::Build &build,
+        const rpc::Event &event,
+        std::list<cs::Entry> &output_compile,
+        std::list<cs::Entry> &output_link,
+        const bool with_link
+    ) {
+        const auto get_entries = [](const auto &semantic) -> std::list<cs::Entry> {
+            const auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
+            return (candidate != nullptr) ? candidate->into_entries() : std::list<cs::Entry>();
+        };
+        bool wrote = false;
+
+        const auto entries_compile = build.recognize(event, cs::semantic::BuildTarget::COMPILER)
+            .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
+        if (!entries_compile.empty()) {
+            wrote = true;
+            std::copy(entries_compile.begin(), entries_compile.end(), std::back_inserter(output_compile));
+        }
+
+        if (with_link) {
+            const auto entries_link = build.recognize(event, cs::semantic::BuildTarget::LINKER)
+                .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
+            if (!entries_link.empty()) {
+                wrote = true;
+                std::copy(entries_link.begin(), entries_link.end(), std::back_inserter(output_link));
+            }
+        }
+
+        return wrote;
+    }
+
+    size_t transform_unsorted_events(
+        const cs::semantic::Build &build,
         const db::EventsDatabaseReader::Ptr& events,
         std::list<cs::Entry> &output_compile,
         std::list<cs::Entry> &output_link,
         const bool with_link
     ) {
-        std::set<size_t> all_ppid;
-        std::set<size_t> writed_command_pids;
+        std::map<size_t, rpc::Event> pid_event;
+        std::map<size_t, std::set<size_t>> pid_children;
+        std::set<size_t> pids_without_parent;
+        std::set<size_t> pids_with_parent;
 
         for (const rpc::Event &event : *events) {
             const size_t pid = event.started().pid();
@@ -211,38 +247,81 @@ namespace {
                 continue;
             }
 
-            if (all_ppid.find(pid) != all_ppid.end()) {
-                return rust::Err(std::runtime_error("Processes in events database are not sorted!"));
+            pid_event.emplace(pid, rpc::Event(event));
+            pid_children[ppid].insert(pid);
+            pids_without_parent.erase(pid);
+            pids_with_parent.insert(pid);
+            if (pids_with_parent.find(ppid) == pids_with_parent.end()) {
+                pids_without_parent.insert(ppid);
             }
-            all_ppid.insert(ppid);
+        }
+        if (pid_event.empty()) {
+            return 0;
+        }
 
-            if (writed_command_pids.find(ppid) != writed_command_pids.end()) {
-                writed_command_pids.insert(pid);
-                continue;
-            }
-
-            const auto get_entries = [](const auto &semantic) -> std::list<cs::Entry> {
-                const auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
-                return (candidate != nullptr) ? candidate->into_entries() : std::list<cs::Entry>();
-            };
-
-            const auto entries_compile = build.recognize(event, cs::semantic::BuildTarget::COMPILER)
-                .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
-            if (!entries_compile.empty()) {
-                writed_command_pids.insert(pid);
-                std::copy(entries_compile.begin(), entries_compile.end(), std::back_inserter(output_compile));
+        for (const auto& p : pids_without_parent) {
+            std::stack<size_t> pids;
+            for (auto rev_iter = pid_children[p].rbegin(); rev_iter != pid_children[p].rend(); ++rev_iter) {
+                pids.push(*rev_iter);
             }
 
-            if (with_link) {
-                const auto entries_link = build.recognize(event, cs::semantic::BuildTarget::LINKER)
-                    .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
-                if (!entries_link.empty()) {
-                    writed_command_pids.insert(pid);
-                    std::copy(entries_link.begin(), entries_link.end(), std::back_inserter(output_link));
+            while (!pids.empty()) {
+                const auto cur_pid = pids.top();
+                pids.pop();
+                if (!transform_event(build, pid_event.at(cur_pid), output_compile, output_link, with_link)) {
+                    for (auto rev_iter = pid_children[cur_pid].rbegin(); rev_iter != pid_children[cur_pid].rend(); ++rev_iter) {
+                        pids.push(*rev_iter);
+                    }
                 }
             }
         }
-        return rust::Ok(output_compile.size() + output_link.size());
+        return output_compile.size() + output_link.size();
+    }
+
+    size_t transform(
+        const cs::semantic::Build &build,
+        const db::EventsDatabaseReader::Ptr& events,
+        std::list<cs::Entry> &output_compile,
+        std::list<cs::Entry> &output_link,
+        const bool with_link,
+        const fs::path &events_file
+    ) {
+        std::list<cs::Entry> output_compile_tmp;
+        std::list<cs::Entry> output_link_tmp;
+
+        std::set<size_t> ppids;
+        std::set<size_t> writed_event_pids;
+
+        for (const rpc::Event &event : *events) {
+            const size_t pid = event.started().pid();
+            const size_t ppid = event.started().ppid();
+            if (pid == 0 && ppid == 0) {
+                continue;
+            }
+            // events are not sorted
+            if (ppids.find(pid) != ppids.end()) {
+                return transform_unsorted_events(
+                    build,
+                    db::EventsDatabaseReader::from(events_file).unwrap(),
+                    output_compile,
+                    output_link,
+                    with_link
+                );
+            }
+            ppids.insert(ppid);
+
+            if (writed_event_pids.find(ppid) != writed_event_pids.end()) {
+                writed_event_pids.insert(pid);
+                continue;
+            }
+            if (transform_event(build, event, output_compile_tmp, output_link_tmp, with_link)) {
+                writed_event_pids.insert(pid);
+            }
+        }
+
+        std::move(output_compile_tmp.begin(), output_compile_tmp.end(), std::back_inserter(output_compile));
+        std::move(output_link_tmp.begin(), output_link_tmp.end(), std::back_inserter(output_link));
+        return output_compile.size() + output_link.size();
     }
 
     rust::Result<size_t> complete_entries_from_json(
@@ -286,9 +365,9 @@ namespace cs {
         std::list<cs::Entry> entries_link;
 
         return db::EventsDatabaseReader::from(arguments_.input)
-            .and_then<size_t>([this, &entries_compile, &entries_link](const auto &commands) {
+            .map<size_t>([this, &entries_compile, &entries_link](const auto &commands) {
                 cs::semantic::Build build(configuration_.compilation);
-                return transform(build, commands, entries_compile, entries_link, arguments_.with_link);
+                return transform(build, commands, entries_compile, entries_link, arguments_.with_link, arguments_.input);
             })
             .and_then<size_t>([this, &output_compile, &entries_compile](size_t new_entries_count) {
                 spdlog::debug("entries created. [size: {}]", new_entries_count);
