@@ -238,7 +238,6 @@ namespace {
         std::list<cs::Entry> &output_link,
         const bool with_link
     ) {
-        std::set<size_t> ppids;
         std::set<size_t> writed_event_pids;
         std::map<size_t, std::set<size_t>> pid_children;
         std::set<size_t> pids_without_parent;
@@ -253,7 +252,6 @@ namespace {
                 continue;
             }
 
-            ppids.insert(ppid);
             pid_children[ppid].insert(pid);
             pids_without_parent.erase(pid);
             pids_with_parent.insert(pid);
@@ -280,11 +278,13 @@ namespace {
                 pids.pop();
 
                 auto entries_iter = pid_entries.find(cur_pid);
+                // tree before meaningful event
                 if (entries_iter == pid_entries.end()) {
                     for (auto rev_iter = pid_children[cur_pid].rbegin(); rev_iter != pid_children[cur_pid].rend(); ++rev_iter) {
                         pids.push(*rev_iter);
                     }
                 }
+                // meaningful event, children should not be written
                 else {
                     std::move(entries_iter->second.compile.begin(), entries_iter->second.compile.end(), std::back_inserter(output_compile));
                     std::move(entries_iter->second.link.begin(), entries_iter->second.link.end(), std::back_inserter(output_link));
