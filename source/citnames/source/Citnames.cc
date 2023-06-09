@@ -29,7 +29,6 @@
 #include <filesystem>
 #include <set>
 #include <map>
-#include <stack>
 
 #ifdef HAVE_FMT_STD_H
 #include <fmt/std.h>
@@ -213,22 +212,22 @@ namespace {
         };
 
         const size_t pid = event.started().pid();
-        bool wrote = false;
+        bool is_written = false;
 
         auto entries_compile = build.recognize(event, cs::semantic::BuildTarget::COMPILER).map<std::list<cs::Entry>>(get_entries).unwrap_or({});
         if (!entries_compile.empty()) {
-            wrote = true;
+            is_written = true;
             std::move(entries_compile.begin(), entries_compile.end(), std::back_inserter(pid_entries[pid].compile));
         }
         if (with_link) {
             auto entries_link = build.recognize(event, cs::semantic::BuildTarget::LINKER).map<std::list<cs::Entry>>(get_entries).unwrap_or({});
             if (!entries_link.empty()) {
-                wrote = true;
+                is_written = true;
                 std::move(entries_link.begin(), entries_link.end(), std::back_inserter(pid_entries[pid].link));
             }
         }
 
-        return wrote;
+        return is_written;
     }
 
     size_t transform(
@@ -268,21 +267,17 @@ namespace {
         }
 
         for (const auto &p : pids_without_parent) {
-            std::stack<size_t> pids;
-            for (auto rev_iter = pid_children[p].rbegin(); rev_iter != pid_children[p].rend(); ++rev_iter) {
-                pids.push(*rev_iter);
-            }
+            std::vector<size_t> pids;
+            std::copy(pid_children[p].rbegin(), pid_children[p].rend(), std::back_inserter(pids));
 
             while (!pids.empty()) {
-                const auto cur_pid = pids.top();
-                pids.pop();
+                const auto cur_pid = pids.back();
+                pids.pop_back();
 
                 auto entries_iter = pid_entries.find(cur_pid);
                 // tree before meaningful event
                 if (entries_iter == pid_entries.end()) {
-                    for (auto rev_iter = pid_children[cur_pid].rbegin(); rev_iter != pid_children[cur_pid].rend(); ++rev_iter) {
-                        pids.push(*rev_iter);
-                    }
+                    std::copy(pid_children[cur_pid].rbegin(), pid_children[cur_pid].rend(), std::back_inserter(pids));
                 }
                 // meaningful event, children should not be written
                 else {
